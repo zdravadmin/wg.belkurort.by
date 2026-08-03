@@ -301,7 +301,7 @@ usort($successLeadId, function($a, $b) {return strcmp($a->last_modified, $b->las
 							
 						//отправляем заявку на бронирование	
 						// if(findcustomfieldval($l,378299) != 1) { // поле аннуляции
-							if(count($checkbooks) == 0 and // в БД нет активных заявок
+							/*if(count($checkbooks) == 0 and // в БД нет активных заявок
 									findcustomfieldval($l,370933) == NULL and // поле суммы возврата
 									// findcustomfieldval($l,305351) == NULL and // поле ссылки на заявку
 									$l['id'] != 20474264) { // Если заявок не отправляли, то отправляем
@@ -318,7 +318,7 @@ usort($successLeadId, function($a, $b) {return strcmp($a->last_modified, $b->las
 									$response = curl_exec($myCurl);
 									curl_close($myCurl);
 								// }
-							}
+							}*/
 						// }
 
 						// Ставим задачу на реанимацию в будущем
