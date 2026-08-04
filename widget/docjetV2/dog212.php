@@ -105,6 +105,7 @@ if($sendedEmail) {
 	$leadAmo = $amo->lead;
 	$leadAmo->addCustomField(305351, "https://mail.yandex.by/?uid=1130000038153703#search?request=Бронирование".str_replace(" ","%20"," ".explode(" ",$fio[0])[0]." ".$data['dog_naimenovanie_obekta_razmescheniya']));
 	$leadAmo->addCustomField(305353, "");
+	$leadAmo->addCustomField(796948, true);
 	$leadAmo->apiUpdate((int)$card_id, 'now');
 
  if($notSend) {
