@@ -19,8 +19,6 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 
 	$lead = getLead($card_id);
 
-	$accInfo = getAccInfo();
-
 	$manager = (isset($_GET['userid'])) ? $_GET['userid'] : $lead['responsible_user_id'];
 
 	// Проверяем наличие файла подписи. Если его нет - генерим от имени руководителя
@@ -132,6 +130,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 		$data['boss_dolzhnost'] = 'Заместитель директора ООО "Здравкурорт"';
 
 		$data['name_manager'] = 'Пулинович Василий Васильевич';
+		$data['phone_manager'] = '+375291956006';
 		$data['podpis'] = 'заместителя директора Пулиновича Василия Васильевича, действующего на основании доверенности №214/1 от 03.06.2026';
 		$data['dolzhnost'] = 'Заместитель директора ООО "Здравкурорт';
 		$data['sign'] = '3563083';
@@ -141,6 +140,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 		$data['boss_dolzhnost'] = 'Заместитель директора по развитию';
 
 		$data['name_manager'] = 'Залевская Марина Леонидовна';
+		$data['phone_manager'] = '+375447969372';
 		$data['podpis'] = 'заместителя директора по развитию Залевской Марины Леонидовны, действующего на основании доверенности №218 от 30.06.2026';
 		$data['dolzhnost'] = 'Заместитель директора по развитию';
 		$data['sign'] = '12485533';
@@ -150,6 +150,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 		$data['boss_dolzhnost'] = 'Директор';
 
 		$data['name_manager'] = 'Свиридович Григорий Александрович';
+		$data['phone_manager'] = '+375291956006';
 		$data['podpis'] = 'директора Свиридовича Григория Александровича, действующего на основании Устава';
 		$data['dolzhnost'] = "Директор";
 		$data['sign'] = '3406348';
@@ -171,13 +172,8 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 			$data['podpis'] = $dolzhnost_v_rod_pad.' '.$managerinfo[0]["fio_v_rod_pad"].', действующего на основании доверенности №'.$managerinfo[0]["num_doverki"].' от '.$managerinfo[0]["date_doverki"];
 			$data['dolzhnost'] = ($managerinfo[0]["dolzhnost"] == "") ? "Специалист" : $managerinfo[0]["dolzhnost"];
 			$data['sign'] = $manager;
-			
-			//получаем имя менеджера
-			foreach ($accInfo['users'] as $val){
-				if ($val['id'] == $manager) {
-							$data['name_manager'] = $val['name'];
-				}
-			}
+            $data['name_manager'] = $managerinfo[0]['name'];
+            $data['phone_manager'] = $managerinfo[0]['phone'];
 		}
 	}
 
