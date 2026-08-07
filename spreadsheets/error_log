@@ -1,5 +1,0 @@
-[30-Jun-2026 15:05:18 Europe/Minsk] PHP Fatal error:  Uncaught exception 'PDOException' with message 'SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sanprimo_zdrav.m_union_date_source' doesn't exist' in /var/www/h98711/data/www/wg.belkurort.by/spreadsheets/new_marketing.php:74
-Stack trace:
-#0 /var/www/h98711/data/www/wg.belkurort.by/spreadsheets/new_marketing.php(74): PDO->query('\nSELECT\n    m_u...')
-#1 {main}
-  thrown in /var/www/h98711/data/www/wg.belkurort.by/spreadsheets/new_marketing.php on line 74
