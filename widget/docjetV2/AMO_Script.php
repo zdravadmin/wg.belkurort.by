@@ -19,8 +19,6 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 
 	$lead = getLead($card_id);
 
-    $accInfo = getAccInfo();
-
 	$manager = (isset($_GET['userid'])) ? $_GET['userid'] : $lead['responsible_user_id'];
 
 	// Проверяем наличие файла подписи. Если его нет - генерим от имени руководителя
@@ -60,40 +58,8 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	}
 
 	$isOpenBookAfterSeptember = false;
-	// $isOpenBookAfterSeptember = ( strtotime($data['data_zaezda']) >= 1709251200 and $data['kvota'] and !in_array($card_id, [25395888, 22197736, 25804962, 25816780,25642130, 25630522, 25630598, 25639914, 25650942, 25651038, 25798570]));
 
 	$isOpenBookAfterSeptemberSending = false;
-	// $isOpenBookAfterSeptemberSending = ($isOpenBookAfterSeptember and ((strtotime($data["data_zaezda"]) - 60*60*24*62) < time()));
-
-	// если БАЗ и заезд после 1 января 25 года - запрещаем генерацию документов
-	// if(strtotime($data['data_zaezda']) >= 1735689600 
-	// 		and !in_array($card_id, [26499608, 26459028])
-	// 		and in_array($data["sanid"], [448613, 448583, 448607, 448611])) {
-	// 	require_once './src/error.php';
-	// 	printError('Продажи в БАЗ после 01.01.2025 запрещены.');
-	// 	exit;
-	// }
-
-	// если стоимость сделки меньше 25000 - запрещаем генерацию документов
-	// if(	$data['cena_uslug'] < 25000 && 
-	// 	$lead['status_id'] !== 142 && 
-	// 	!in_array($card_id, [27885780, 27843750, 27839082, 27832960, 27778982, 27747326, 27688890, 27629250, 27524562, 27495378, 27486860, 27469920, 25014288, 27343586, 27255560, 27407684, 27490952 ]) &&
-	// 	!in_array($_GET['userid'],['3406348'])) {
-	// 	require_once './src/error.php';
-	// 	printError('Продажи с чеком сделки меньше 25000 рос. руб. запрещены.');
-	// 	exit;
-	// }
-
-	// если дата договора четверг или пятница и заезд в сб, вс, пн - ничего не генерируем
-	// if(isNeedStopAnyGeneration($data['data_dogovora'], $data['data_zaezda']) and 
-	// 	!in_array($card_id, [ 27869532, 27399978, 24118184,27316094, 27329174, 27116940, 27122890, 27185934, 27090208, 27085186, 27039286, 26854104, 26961324, 26837700, 26797806, 26238634, 26247666, 26288812, 26196148, 26452410, 26504486, 26557999, 26618634, 23104094, 26647930, 26749250, 26754672, 26758172, 26777810 ]) and
-	// 	!in_array($docType, [8, 5, 3, 4]) and 
-	// 	$lead['status_id'] !== 142 &&
-	// 	!in_array($_GET['userid'],['3406348'])) {
-	// 	require_once './src/error.php';
-	// 	printError('Дата заезда слишком близко. Клиент не успеет перечислить нам деньги а мы не успеем оплатить в санаторий до заезда.');
-	// 	exit;
-	// }
 
 	// вычисляем количество дней и часов для оплаты
 	$data['due_days'] = getWorkDays($data['hypot_date_pay']);
@@ -123,7 +89,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	$data['data_zaezda_minus_2_month'] = $data['data_zaezda_minus_2_month']->format('d.m.Y');
 
 	//Получаем информацию по манагеру
-	$stmt = $db->query('SELECT num_doverki, fio_v_rod_pad, DATE_FORMAT(date_doverki,"%d.%m.%Y") as date_doverki, dolzhnost, dolzhnost_v_rod_pad FROM users where id ='.$manager);
+	$stmt = $db->query('SELECT name, fio_v_rod_pad, DATE_FORMAT(date_doverki,"%d.%m.%Y") as date_doverki, dolzhnost, dolzhnost_v_rod_pad FROM users where id ='.$manager);
 	$managerinfo = $stmt->fetchAll();
 
     if (date('Y.m.d') >= '2026.07.10' && date('Y.m.d') <= '2026.07.15') {
@@ -158,15 +124,6 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 		$data['sign'] = '3406348';
 	}
 
-	// //если возвраты, то ставим ответственную Оксану
-	// if(in_array($doc, array('dog81','dog84','dog85'))) {
-	// 	$stmt = $db->query('SELECT num_doverki, fio_v_rod_pad, DATE_FORMAT(date_doverki,"%d.%m.%Y") as date_doverki, dolzhnost, dolzhnost_v_rod_pad, `name` FROM users where id = 3449311');
-	// 	$clienticsmanagerinfo = $stmt->fetchAll();
-	// 	$clienticsmanagerarray = explode(" ", $clienticsmanagerinfo[0]['name']);
-	// 	$data['boss_name'] = $clienticsmanagerarray[0].' '.mb_substr($clienticsmanagerarray[1], 0, 1).'. '.mb_substr($clienticsmanagerarray[2], 0, 1).'.';
-	// 	$data['boss_podpis'] = $clienticsmanagerinfo[0]["dolzhnost_v_rod_pad"].' '.$clienticsmanagerinfo[0]["fio_v_rod_pad"].', действующего на основании доверенности №'.$clienticsmanagerinfo[0]["num_doverki"].' от '.$clienticsmanagerinfo[0]["date_doverki"];
-	// 	$data['boss_dolzhnost'] = $clienticsmanagerinfo[0]["dolzhnost"];		
-	// }	
 
 	if(isset($managerinfo[0])) {
 		if($managerinfo[0]["num_doverki"] != 0) {
@@ -174,34 +131,15 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 			$data['podpis'] = $dolzhnost_v_rod_pad.' '.$managerinfo[0]["fio_v_rod_pad"].', действующего на основании доверенности №'.$managerinfo[0]["num_doverki"].' от '.$managerinfo[0]["date_doverki"];
 			$data['dolzhnost'] = ($managerinfo[0]["dolzhnost"] == "") ? "Специалист" : $managerinfo[0]["dolzhnost"];
 			$data['sign'] = $manager;
+            $data['name_manager'] = $managerinfo[0]['name'];
             $data['phone_manager'] = $managerinfo[0]['phone'];
 		}
-
-        //получаем имя менеджера
-        foreach ($accInfo['users'] as $val){
-            if ($val['id'] == $manager) {
-                $data['name_manager'] = $val['name'];
-            }
-        }
 	}
 
 	//Получаем информацию по санаторию
 	$data['kurort_sbor'] = 'в цену туристических услуг не входит и в месте размещения самостоятельно уплачивается Заказчиком курортный сбор (статьи 313-319 Налогового кодекса Республики Беларусь), если он установлен в районе (населённом пункте), в котором находится место оказания туристических услуг.';
 	$stmt = $db->query('SELECT * FROM foundation where id ='.$data["sanid"]);
 	$infoaboutsan = $stmt->fetchAll();
-
-	// Если цен нет - ничего не генерируем
-	// if(	strtotime($data['data_zaezda']) > strtotime($infoaboutsan[0]['stop_sale_from']) and 
-	// 	!in_array($card_id, [ 27393196, 25925902, 26104884, 26142632, 26163262, 26207350, 26174222, 26248394, 26260828, 26343224, 26497686, 26500170, 26754672]) and
-	// 	!(in_array($data["sanid"], [474901, 437471, 796508, 459521, 464911, 480065, 458451, 783316, 453229, 450649, 469593, 465157, 452097, 467899, 471283, 473417]) and in_array($docType, [0, 2, 4, 9])) and 
-	// 	!(in_array($data["sanid"], [448583, 448607, 448613, 448611]) and in_array($docType, [0, 2, 4, 9])) and // баз на лето 25 - можно слать заявки - нельзя договор
-	// 	$lead['status_id'] !== 142 &&
-	// 	!in_array($_GET['userid'],['3406348'])
-	// ) {
-	// 	require_once './src/error.php';
-	// 	printError('Цены на этот санаторий не заданы на текущую дату заезда');
-	// 	exit;
-	// }
 
 	if($data["sanid"] == 531911) {
 		$data['kurort_sbor'] = '';
@@ -233,11 +171,6 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 		$data['pitanie'] = 'Дежурное меню';
 	}
 
-	// if($data["sanid"] == 464917 and time() > 1641589200) {
-	// 	$data['dog_chasy_zaezda_vyezda'] = "заезд с 21:00 накануне первого дня путевки (первая услуга «завтрак»), выезд до 19:00 последнего дня путевки (последняя услуга «ужин»)";
-	// }
-	
-
 	$data['email'] = $infoaboutsan[0]["email"];
 	$data['sutki_dni'] = $infoaboutsan[0]["dayorsut"];
 	$data['san_country'] = $infoaboutsan[0]["country"];
@@ -249,24 +182,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 
 	$data['rf_test_covid'] = (in_array($data["sanid"], [448583, 448613, 448611, 448607, 478371, 785980])) ? $infoaboutsan[0]["rf_test_covid"] : $data["rf_test_covid"];
 
-	// if(stripos($data['sutki_dni'], "дн") === false) {
-	// 	$data['kolichestvo_dney'] = ((strtotime($data['data_vyezda']) - strtotime($data['data_zaezda']))/60/60/24);
-	// } else {
-	// 	$data['kolichestvo_dney'] = ((strtotime($data['data_vyezda']) - strtotime($data['data_zaezda']))/60/60/24)+1;
-	// }
-
 	$idtouroperator = findcustomfieldvalid($lead, 339925);
-
-	// Если письмо в управделами - то заявка должна отправиться в ЦК
-	// if(in_array(strval($data['sanid']), array('458451', '486053', '473417', '452097'))) {
-	// 	$stmt = $db->query('SELECT * FROM touroperators where id = 493015');
-	// 	$data['email'] = $stmt->fetchAll()[0]["email"];
-	// }
-
-	// // Если санаторий принадлежит одному из списка - отправляем заявку в ЦК
-	// if(in_array(strval($data['sanid']), array('458451', '486053', '473417', '452097'))) {
-	// 	$idtouroperator = 493015;
-	// };
 
 	if($idtouroperator != 493013 and $idtouroperator != null) {
 		$stmt = $db->query('SELECT * FROM touroperators where id ='.$idtouroperator);
@@ -392,21 +308,6 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 		$data['turist_dogovor_fio_pasport_propiska'] = (isset($pril['not_going'][0]['fio'])) ? $pril['not_going'][0]['fio'] : $pril['going'][0]['fio'];
 		$data['dog_edet_li_turist_dogovor'] = $data['prilozhenie'][0]['fio'];
 		$data['tip_nomera'] = $pril['tip_nomera'];
-	// } else {
-	// 	$data['prilozhenie'] = getPrilozhenie($lead);
-	// 	$data['prilozhenieUpd'] = getPrilozhenieUpd($lead);
-	// 	if(findcustomfieldval($lead,314783) == 1) {
-	// 		$data['dog_edet_li_turist_dogovor'] = $data['turist_2'];
-	// 	} else {
-			// $data['dog_edet_li_turist_dogovor'] = $data['turist_dogovor_fio_pasport_propiska'];
-	// 	};
-	
-		// if(findcustomfieldval($lead,377797) != "747661") {
-		// 	$data['not_rb'] = true;
-		// } else {
-		// 	$data['not_rb'] = false;
-		// };
-	// }
 
 	if($pril['kolichestvo_turistov'] > 0) {
 		$data['kolichestvo_turistov'] = $pril['kolichestvo_turistov'];
@@ -621,15 +522,6 @@ function checkField($field, $head) {
 function getPrilozhenie($lead) {
 	//Заполняем приложение к договору
 	$arrTourist = [];
-	// if(findcustomfieldval($lead,305299) != null and findcustomfieldval($lead,314783) == null) {
-	// 	array_push($arrTourist, array(
-	// 	'fio' => findcustomfieldval($lead,305299),
-	// 	'type_appart' => findcustomfieldval($lead,324415),
-	// 	'kind_appart' => findcustomfieldval($lead,324427),
-	// 	'feeding' => findcustomfieldval($lead,324451),
-	// 	'type_health' => findcustomfieldval($lead,324461),
-	// 	));
-	// }
 
 	$arrTourist = addTouristInArr($arrTourist,$lead, 305301, 324417, 324429, 324453, 324463);
 	$arrTourist = addTouristInArr($arrTourist,$lead, 305303, 324419, 324435, 324455, 324465);
@@ -783,11 +675,7 @@ function getPrilozhenieDB($lead, $checkin, $checkout){
 			}
 		
 	}
-	
-	// if($managerinfo[0]["price"] == 0 and $managerinfo[0]["checkguest"] == 1) {
-	// 	$is_all_price_not_null = false;
-	// }
-	
+
 	$outputarr['going'] = $going;
 	$outputarr['not_going'] = $not_going;
 	$outputarr['tip_nomera'] = implode(", ", array_unique($tip_nomera));
@@ -818,17 +706,7 @@ function getPrilozhenieUpdDB($data, $sumtransfer, $checkin, $checkout) {
 		if($d["sales_count_days"] !== NULL) {
 			$d["type_health"] = $guestSaleString;
 		}
-		
-	/*	
-		if($d["sales_count_days"] !== NULL) {
-			$sale_from = new DateTime($checkout.' -'.$d["sales_count_days"].' days');
-			$sale_from = $sale_from->format('d.m.Y');
-			$d["type_health"] = 'с '.date('d.m.Y', strtotime($checkin)).' по '.$sale_from.' «'.$d["type_health"].'» + с '.$sale_from.' по '.date('d.m.Y', strtotime($checkout)).' «'.$d["sales_name"].'»';
-			array_push($sd, $justfio.' '.$d["type_health"]);
-		} else {
-			array_push($sd, $justfio.' с '.date('d.m.Y', strtotime($checkin)).' по '.date('d.m.Y', strtotime($checkout)));
-		}
-	*/
+
 		$prozhivanie = ($d["kind_appart"] == "Без места") ? "": "услуги проживания (".$d["type_appart"].", ".$d["kind_appart"]."), ";
 		$pitanie = ($d["feeding"] == "Без питания") ? "" : "услуги питания (".$d["feeding"]."), ";
 		$lechenie = ($d["type_health"] == "Без лечения") ? "" : "медицинские услуги (Лечение: ".$d["type_health"]."), ";
@@ -877,18 +755,6 @@ function getDateWithSales($checkin, $checkout, $type_health, $sales_name = NULL,
 function getPrilozhenieUpd($lead){
 	//Заполняем приложение к договору
 	$arrTourist = [];
-	// if(findcustomfieldval($lead,305299) != null and findcustomfieldval($lead,314783) == null) {
-	// 	array_push($arrTourist, array(
-	// 	'fio' => findcustomfieldval($lead,305299),
-	// 	'type_appart' => findcustomfieldval($lead,324415),
-	// 	'kind_appart' => findcustomfieldval($lead,324427),
-	// 	'feeding' => findcustomfieldval($lead,324451),
-	// 	'type_health' => findcustomfieldval($lead,324461),
-	// 	't_appart' => (findcustomfieldval($lead,324427) == "Без места") ? false : true ,
-	// 	't_feeding' => (findcustomfieldval($lead,324451) == "Без питания") ? false : true ,
-	// 	't_th' => (findcustomfieldval($lead,324461) == "Без лечения") ? false : true
-	// 	));
-	// }
 
 	$arrTourist = addTouristInArr($arrTourist,$lead, 305301, 324417, 324429, 324453, 324463);
 	$arrTourist = addTouristInArr($arrTourist,$lead, 305303, 324419, 324435, 324455, 324465);
@@ -1048,32 +914,6 @@ function find_kurs($cur) {
 		}
 	}
 
-	// function converterValut($guest_price, $guest_valuta, $dog_valuta, $valutes) {
-	// 	if($guest_valuta == $dog_valuta) {
-	// 		return floatval($guest_price);
-	// 	}
-		
-	// 	$para = $guest_valuta.$dog_valuta;
-	// 	//Получаем курсы валют из таблицы Насти на дату договора
-	// 	$kurs = $valutes[$para];
-		
-	// 	if($kurs) {
-	// 	$quantity = ($para == "BYNRUB" or $para == "RUBBYN") ? 100 : 1 ;
-		
-	// 		if($para == "BYNRUB" or 
-	// 		$para == "BYNEUR" or 
-	// 		$para == "BYNUSD" or 
-	// 		$para == "RUBEUR" or
-	// 		$para == "RUBUSD" or
-	// 		$para == "EURUSD") {
-	// 			$result = $guest_price * $quantity / $kurs ;
-	// 		} else {
-	// 			$result = $guest_price * $kurs / $quantity;
-	// 		}
-	// 	}
-	// 	return round($result);
-	// };
-	
 	function getInnerCursesFromDB($date) {
 		$date = $date ? date('Y-m-d H:i:s',strtotime($date)) : date("Y-m-d H:i:s");
 
