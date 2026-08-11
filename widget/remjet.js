@@ -685,9 +685,17 @@ var RemoteGet = function () {
 				}
 		}
 
-		self.hidePipelinesFromLeftPanel = function (exceptionUsersId, exceptionPiplinesId) {
+		self.hidePipelinesFromLeftPanel = function (exceptionUsersId, exceptionPiplinesId, tries = 50) {
 			if(self.pipelineObserver) self.pipelineObserver.disconnect();
 			if(exceptionUsersId.includes(self.amouser_id)) return;
+
+			const targetNode = document.getElementById('left_menu');
+			// левое меню может быть ещё не отрисовано — ждём
+			if(!targetNode) {
+				if(tries > 0) setTimeout(() => self.hidePipelinesFromLeftPanel(exceptionUsersId, exceptionPiplinesId, tries - 1), 200);
+				return;
+			}
+
 			self.pipelineObserver = new MutationObserver((mutations) => {
 					mutations.forEach((mutation) => {
 						if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
@@ -707,7 +715,6 @@ var RemoteGet = function () {
 					});
 					});
 
-			const targetNode = document.getElementById('left_menu');
 			self.pipelineObserver.observe(targetNode, { childList: true, subtree: true });
 		}
 
@@ -962,6 +969,7 @@ var RemoteGet = function () {
 		self.offInputFields = function (fieldsArray) {
 			fieldsArray.forEach(field => {
 				const $field = document.querySelector(`[name="CFV[${field}]"]`)
+				if(!$field) return;
 				// $field.setAttribute("disabled", "disabled")
 				$field.setAttribute("readonly", "readonly")
 				$field.parentElement.classList.add('linked-form__field__value_disabled')
@@ -969,9 +977,14 @@ var RemoteGet = function () {
 			})
 		}
 
-		self.openKeyboardOnMobile = function (cf) {
+		self.openKeyboardOnMobile = function (cf, tries = 50) {
 			// Выбираем целевой элемент
 			var target = document.querySelector(`[name="CFV[${cf}]"]`);
+			// поле может быть ещё не отрисовано к моменту bind_actions — ждём
+			if (!target) {
+				if (tries > 0) setTimeout(() => self.openKeyboardOnMobile(cf, tries - 1), 200);
+				return;
+			}
 			// Конфигурация observer (за какими изменениями наблюдать)
 			const config = {
 				attributes: true
@@ -997,9 +1010,14 @@ var RemoteGet = function () {
 			self.observers.push(observer);
 		}
 
-		self.closeWazzupWindow = function () {
+		self.closeWazzupWindow = function (tries = 50) {
 			// Выбираем целевой элемент
 			const target = document.getElementById('card_holder');
+			// карточка может быть ещё не отрисована — ждём
+			if (!target) {
+				if (tries > 0) setTimeout(() => self.closeWazzupWindow(tries - 1), 200);
+				return;
+			}
 			// Конфигурация observer (за какими изменениями наблюдать)
 			const config = {
 				attributes: true
@@ -1272,6 +1290,29 @@ var RemoteGet = function () {
 			})
 		}
 
+		// части карточки создаются не сразу — ждём появления значения перед использованием
+		self.whenReady = (getValue, callback, label = 'значение', tries = 50) => {
+			const value = getValue();
+			if(value) {
+				callback(value);
+				return;
+			}
+			if(tries <= 0) {
+				console.warn(`remjet: ${label} так и не появилось`);
+				return;
+			}
+			setTimeout(() => self.whenReady(getValue, callback, label, tries - 1), 200);
+		}
+
+		self.onCardModelReady = (callback) =>
+			self.whenReady(() => APP.data.current_card?.model, callback, 'APP.data.current_card.model');
+
+		self.onSaveBtnReady = (callback) =>
+			self.whenReady(() => {
+				const $btn = AMOCRM.data.current_card?.$save_btn;
+				return $btn && $btn.length ? $btn : null;
+			}, callback, 'AMOCRM.data.current_card.$save_btn');
+
 		self.stopAccomodationSale = () => {
 			const banSan = [
 											// {
@@ -1385,10 +1426,12 @@ var RemoteGet = function () {
 			hideNativePoints();
 			hideFindModulePoints();
 
-			APP.data.current_card.model.on('change', (model) => {
-				if([305333, 305203].some(id => model.changed[`CFV[${id}]`])) {
-					checkRules(false);
-				}
+			self.onCardModelReady(cardModel => {
+				cardModel.on('change', (model) => {
+					if([305333, 305203].some(id => model.changed[`CFV[${id}]`])) {
+						checkRules(false);
+					}
+				});
 			});
 
 			// $checkIn.change(checkRules);
@@ -1540,6 +1583,15 @@ var RemoteGet = function () {
 				return true;
 			},
 			bind_actions: function () {
+				// на карточке сделки почти всё завязано на current_card.model,
+				// а он создаётся позже bind_actions — откладываем вызов целиком,
+				// пока ничего не успело навеситься (иначе получим дубли обработчиков)
+				const isLeadCard = location.pathname.indexOf('/leads/detail/') != -1 || location.pathname.indexOf('/leads/add/') != -1;
+				if (isLeadCard && !APP.data.current_card?.model) {
+					self.onCardModelReady(() => self.callbacks.bind_actions());
+					return true;
+				}
+
 				self.stopChangeResponsibleUser();
 
 				const findBtn = $('#save_and_close_contacts_link')
@@ -1557,32 +1609,44 @@ var RemoteGet = function () {
 					self.openKeyboardOnMobile("345077");
 					self.emptyWidgetField();
 
-					APP.data.current_card.model.on('change', (model) => {
-						if(self.rasschetCen.some(id => model.changed[`CFV[${id}]`])) {
-							self.timedRaschetCen();
-						}
-						if(model.changed['lead[STATUS]']) {
-							self.onlyGo();
-						}
-						if([305203, 305205, 313433].some(id => model.changed[`CFV[${id}]`])) {
-							self.mathdays();
-						}
+					self.onCardModelReady(cardModel => {
+						cardModel.on('change', (model) => {
+							if(self.rasschetCen.some(id => model.changed[`CFV[${id}]`])) {
+								self.timedRaschetCen();
+							}
+							if(model.changed['lead[STATUS]']) {
+								self.onlyGo();
+							}
+							if([305203, 305205, 313433].some(id => model.changed[`CFV[${id}]`])) {
+								self.mathdays();
+							}
+						});
 					});
 
 					if ([3449320, 9567381, 12335137].indexOf(self.amouser_id) != -1) {
-						AMOCRM.data.current_card.validator.rules.leads.p_1736272.s_26081356 = AMOCRM.data.current_card.validator.rules.leads.p_1736272.s_26081356.filter(a => a != "CFV[346135]" && a != "CFV[346137]");
-						AMOCRM.data.current_card.$save_btn.on('click', () => {
-							self.changeStatusIfInputPay();
-							self.taskOnChangeSumOfBill();
+						self.whenReady(
+							() => AMOCRM.data.current_card?.validator?.rules?.leads?.p_1736272?.s_26081356,
+							rules => {
+								AMOCRM.data.current_card.validator.rules.leads.p_1736272.s_26081356 = rules.filter(a => a != "CFV[346135]" && a != "CFV[346137]");
+							},
+							'validator.rules.leads.p_1736272.s_26081356'
+						);
+						self.onSaveBtnReady($saveBtn => {
+							$saveBtn.on('click', () => {
+								self.changeStatusIfInputPay();
+								self.taskOnChangeSumOfBill();
+							});
 						});
 						$("input[name='CFV[305363]']").on('input', () => { self.correctCostSan(); });
 					}
 					self.requestController();
 					self.copyInfoByNameLeadToNameContact();
 					self.hideValutes();
-					AMOCRM.data.current_card.$save_btn.on('click', () => {
-						self.blockBillField();
-						self.checkBill();
+					self.onSaveBtnReady($saveBtn => {
+						$saveBtn.on('click', () => {
+							self.blockBillField();
+							self.checkBill();
+						});
 					});
 
 					$("input[name='CFV[305139]']").change(() => { $('[name="CFV[305169]"]').val(Number($('[name="CFV[305337]"]').val()) + Number($('[name="CFV[305139]"]').val())).change() });
@@ -1632,8 +1696,9 @@ var RemoteGet = function () {
 
 					let previousKvotaVal = AMOCRM.data.current_card.model.defaults["CFV[351975]"]
 					setInterval(() => {
-						if (!!AMOCRM.data.current_card.model && AMOCRM.data.current_card.model.defaults["CFV[351975]"] != previousKvotaVal) {
-							previousKvotaVal = AMOCRM.data.current_card.model.defaults["CFV[351975]"]
+						const model = AMOCRM.data.current_card?.model;
+						if (model && model.defaults["CFV[351975]"] != previousKvotaVal) {
+							previousKvotaVal = model.defaults["CFV[351975]"]
 							self.hideValutes()
 							self.changeValutes()
 						}
