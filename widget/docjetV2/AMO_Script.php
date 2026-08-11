@@ -99,7 +99,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
                                 THEN number
                                 ELSE CONCAT(number, "/", sub_number)
                             END as num_doverki,
-                            DATE_FORMAT(date_start,"%d.%m.%Y") as date_doverki
+                            DATE_FORMAT(date_created,"%d.%m.%Y") as date_doverki
                         FROM powers_of_attorney
                         WHERE number != 0
                             and date_start <= "'.$dateDogovoraSql.'"
