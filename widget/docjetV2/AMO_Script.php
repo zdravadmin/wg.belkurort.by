@@ -89,8 +89,25 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	$data['data_zaezda_minus_2_month'] = $data['data_zaezda_minus_2_month']->format('d.m.Y');
 
 	//Получаем информацию по манагеру
-	$stmt = $db->query('SELECT name, fio_v_rod_pad, DATE_FORMAT(date_doverki,"%d.%m.%Y") as date_doverki, dolzhnost, dolzhnost_v_rod_pad FROM users where id ='.$manager);
+	$stmt = $db->query('SELECT name, phone, fio_v_rod_pad, dolzhnost, dolzhnost_v_rod_pad FROM users where id ='.$manager);
 	$managerinfo = $stmt->fetchAll();
+
+    // Ищем доверенность менеджера, действующую на дату договора
+    $dateDogovoraSql = date('Y-m-d', strtotime($data['data_dogovora']));
+    $stmt2 = $db->query('SELECT
+                            CASE WHEN sub_number = 0
+                                THEN number
+                                ELSE CONCAT(number, "/", sub_number)
+                            END as num_doverki,
+                            DATE_FORMAT(date_start,"%d.%m.%Y") as date_doverki
+                        FROM powers_of_attorney
+                        WHERE number != 0
+                            and date_start <= "'.$dateDogovoraSql.'"
+                            and (date_end IS NULL or date_end >= "'.$dateDogovoraSql.'")
+                            and amo_user_id ='.$manager.'
+                        ORDER BY date_start DESC
+                        LIMIT 1');
+    $poa = $stmt2->fetchAll();
 
     if (date('Y.m.d') >= '2026.07.10' && date('Y.m.d') <= '2026.07.15') {
 		$data['boss_name'] = 'Пулинович В.В.';
@@ -125,10 +142,10 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	}
 
 
-	if(isset($managerinfo[0])) {
-		if($managerinfo[0]["num_doverki"] != 0) {
+	if(isset($poa[0])) {
+		if($poa[0]["num_doverki"] != 0) {
 			$dolzhnost_v_rod_pad = ($managerinfo[0]["dolzhnost_v_rod_pad"] == "") ? "cпециалиста" : $managerinfo[0]["dolzhnost_v_rod_pad"];
-			$data['podpis'] = $dolzhnost_v_rod_pad.' '.$managerinfo[0]["fio_v_rod_pad"].', действующего на основании доверенности №'.$managerinfo[0]["num_doverki"].' от '.$managerinfo[0]["date_doverki"];
+			$data['podpis'] = $dolzhnost_v_rod_pad.' '.$managerinfo[0]["fio_v_rod_pad"].', действующего на основании доверенности №'.$poa[0]["num_doverki"].' от '.$poa[0]["date_doverki"];
 			$data['dolzhnost'] = ($managerinfo[0]["dolzhnost"] == "") ? "Специалист" : $managerinfo[0]["dolzhnost"];
 			$data['sign'] = $manager;
             $data['name_manager'] = $managerinfo[0]['name'];
