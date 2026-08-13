@@ -13,7 +13,7 @@ setInnerCourses($tomorrow);
 function setInnerCourses($date) {
   global $db;
 
-  $percent = 0.01;
+  $percent = 0.02;
   $percentMinus = 1-$percent;
   $percentPlus = 1+$percent;
 
