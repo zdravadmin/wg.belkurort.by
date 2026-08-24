@@ -1655,13 +1655,13 @@ self.get_price_kurort_SanatoriiBereste = function(resident, already_client, dv) 
 self.get_price_kurort_SanatoriiBorovoe = function(resident, already_client, dv) {
   const name_458451 = 'Санаторий "Боровое"';
 	if (resident && dv === 'BYN')
-		return already_client ? 54 : 105;
+		return already_client ? 14 : 27;
 	else {
 		if (dv === 'EUR')
-			return already_client ? 18 : 36;
+			return already_client ? 8 : 16;
 		else if (dv === 'USD')
-			return already_client ? 18 : 36;
-		return already_client ? 1500 : 3000;
+			return already_client ? 8 : 16;
+		return already_client ? 750 : 1500;
 	}
 },
 
@@ -2013,13 +2013,13 @@ self.get_price_kurort_SanatoriiSerebriannyekliuchi = function(resident, already_
 self.get_price_kurort_SanatoriiSolnechnyi = function(resident, already_client, dv) {
   const name_783316 = 'Санаторий "Солнечный"';
 	if (resident && dv === 'BYN')
-		return already_client ? 54 : 105;
+		return already_client ? 14 : 27;
 	else {
 		if (dv === 'EUR')
-			return already_client ? 18 : 36;
+			return already_client ? 8 : 16;
 		else if (dv === 'USD')
-			return already_client ? 18 : 36;
-		return already_client ? 1500 : 3000;
+			return already_client ? 8 : 16;
+		return already_client ? 750 : 1500;
 	}
 },
 
