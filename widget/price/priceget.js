@@ -14,6 +14,11 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 		self.kursNBRB = [];
 		self.innerKurs = [];
 		self.searchSanatoriiNow = false;
+		self.hiddenSanatoriiIds = [];
+		self.hiddenSanatoriiUrl = 'https://admin.belkurort.by/api/widget/hidden-sanatoriums';
+		self.hiddenSanatoriiTtl = 5 * 60 * 1000;
+		self.hiddenSanatoriiLoadedAt = 0;
+		self.hiddenSanatoriiRequest = null;
 		self.currency = {
 			innerCurs: {},
 			getInnerCurs: async function (date = new Date()) {
@@ -417,6 +422,41 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 				}
 			},
 
+			self.loadHiddenSanatorii = function (force) {
+				// список правят редко — держим его в памяти и перечитываем не чаще раза в hiddenSanatoriiTtl
+				if(!force && Date.now() - self.hiddenSanatoriiLoadedAt < self.hiddenSanatoriiTtl)
+					return Promise.resolve(self.hiddenSanatoriiIds);
+
+				// если запрос уже в полёте — ждём его, а не шлём второй
+				if(self.hiddenSanatoriiRequest) return self.hiddenSanatoriiRequest;
+
+				self.hiddenSanatoriiRequest = fetch(self.hiddenSanatoriiUrl, { cache: 'no-cache' })
+					.then(response => {
+						if(!response.ok) throw new Error('HTTP ' + response.status);
+						return response.json();
+					})
+					.then(list => {
+						if(!Array.isArray(list)) throw new Error('ожидался массив');
+						// принимаем и [829316, ...], и [{ id, name }, ...]
+						self.hiddenSanatoriiIds = list.map(san => String(san?.id ?? san));
+						self.hiddenSanatoriiLoadedAt = Date.now();
+						return self.hiddenSanatoriiIds;
+					})
+					.catch(e => {
+						// сервер не ответил — оставляем последний удачно загруженный список
+						console.log('hidden-sanatoriums:', e);
+						return self.hiddenSanatoriiIds;
+					})
+					.finally(() => { self.hiddenSanatoriiRequest = null; });
+
+				return self.hiddenSanatoriiRequest;
+			},
+
+			self.getSanatoriiOptionId = function (element) {
+				// в родном списке id лежит в data-value, в результатах поиска — в value
+				return String(element.dataset?.value || element.getAttribute?.('value') || '');
+			},
+
 			self.foundationComboBox = function () {
 
 				const sanatorii = $("div.linked-form__field-select[data-id='305089']")
@@ -424,6 +464,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 					const sBtn = sanatorii.find("button.control--select--button")
 					if(sBtn) {
 						sBtn.on('click', function() {
+							self.loadHiddenSanatorii();
 							self.searchSanatoriiNow = true;
 							self.hideSanatorii();
 						});
@@ -438,7 +479,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 						if(list2) {
 							for(let i = 0; i < list2.children.length; i++) {
 								let element = list2.children[i];
-								if(element.innerText.indexOf('Чаборок') > -1 || element.innerText.indexOf('Дубровенка') > -1) {
+								if(self.hiddenSanatoriiIds.includes(self.getSanatoriiOptionId(element))) {
 									element.style.display = 'none';
 									element.style.visibility = 'hidden';
 								}
@@ -2636,6 +2677,7 @@ self.get_price_kurort_SanatoriiZhuravushka = function(resident, already_client, 
 					self.dogovorGenerationCheck() // проверить наличие договора в 'Генерация'
 					self.openingChannelCheck() // проверить из какого канал открыта сделка
 					self.saveButton()	// кнопка сохранения
+					self.loadHiddenSanatorii()	// список скрываемых санаториев из админки
 					self.foundationComboBox()	// кнопка выбора санатория
 					self.statusOptionsBlock() // смена статуса сделки
 
