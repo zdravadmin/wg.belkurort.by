@@ -14,9 +14,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 		self.kursNBRB = [];
 		self.innerKurs = [];
 		self.hiddenSanatoriiIds = [];
-		// поле 305089 рисует то родной селект амо, то виджет gnzs — следим за обоими
-		self.hiddenSanatoriiSelectors = 'ul.control--select--list > li, ul.searched_list_elements > li, li[class*="gnzs-contractor--listItem"]';
-		self.sanatoriiObserver = null;
+		self.hiddenSanatoriiStyleId = 'wg-hidden-sanatoriums';
 		self.hiddenSanatoriiUrl = 'https://admin.belkurort.by/api/widget/hidden-sanatoriums';
 		self.hiddenSanatoriiTtl = 5 * 60 * 1000;
 		self.hiddenSanatoriiLoadedAt = 0;
@@ -442,6 +440,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 						// принимаем и [829316, ...], и [{ id, name }, ...]
 						self.hiddenSanatoriiIds = list.map(san => String(san?.id ?? san));
 						self.hiddenSanatoriiLoadedAt = Date.now();
+						self.renderHiddenSanatoriiStyle();
 						return self.hiddenSanatoriiIds;
 					})
 					.catch(e => {
@@ -454,45 +453,28 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 				return self.hiddenSanatoriiRequest;
 			},
 
-			self.getSanatoriiOptionId = function (element) {
-				// id лежит либо на самом пункте (data-value в родном списке, value в результатах поиска),
-				// либо на вложенном span — как в списке gnzs
-				return String(element.dataset?.value
-					|| element.getAttribute?.('value')
-					|| element.querySelector?.('[data-value]')?.getAttribute('data-value')
-					|| '');
-			},
+			self.renderHiddenSanatoriiStyle = function () {
+				// прячем правилом CSS, а не инлайновыми стилями: список рисует vue,
+				// и правка его узлов ломает перерисовку при поиске
+				let style = document.getElementById(self.hiddenSanatoriiStyleId);
+				if(!style) {
+					style = document.createElement('style');
+					style.id = self.hiddenSanatoriiStyleId;
+					document.head.appendChild(style);
+				}
 
-			self.hideSanatoriiOptions = function () {
-				let hidden = 0;
-				document.querySelectorAll(self.hiddenSanatoriiSelectors).forEach(element => {
-					if(!self.hiddenSanatoriiIds.includes(self.getSanatoriiOptionId(element))) return;
-					element.style.display = 'none';
-					element.style.visibility = 'hidden';
-					hidden++;
-				});
-				return hidden;
-			},
+				const rules = self.hiddenSanatoriiIds
+					.filter(id => /^\d+$/.test(id))
+					.map(id => [
+						// родной селект и родной поиск амо
+						'ul.control--select--list > li[data-value="' + id + '"],',
+						'ul.searched_list_elements > li[value="' + id + '"] { display: none !important; }',
+						// список gnzs — отдельным правилом, чтобы неподдержанный :has() не убил предыдущее
+						'li[class*="gnzs-contractor--listItem"]:has([data-value="' + id + '"]) { display: none !important; }'
+					].join('\n'));
 
-			self.watchSanatoriiOptions = function () {
-				if(self.sanatoriiObserver) return;
-
-				// список может рисовать сторонний виджет, клика по родной кнопке может не быть —
-				// поэтому ждём появления пунктов в документе, а не открытия селекта
-				let scheduled = false;
-				self.sanatoriiObserver = new MutationObserver(() => {
-					if(scheduled) return;
-					scheduled = true;
-					setTimeout(() => {
-						scheduled = false;
-						if(!document.querySelector(self.hiddenSanatoriiSelectors)) return;
-						// список открыли — заодно освежаем перечень, если истёк TTL
-						self.loadHiddenSanatorii().then(self.hideSanatoriiOptions);
-					}, 100);
-				});
-
-				// стили меняем только через атрибуты, а их не слушаем — сами себя не зациклим
-				self.sanatoriiObserver.observe(document.body, { childList: true, subtree: true });
+				style.textContent = rules.join('\n');
+				return style;
 			},
 
 			self.saveButton = function () {
@@ -2680,8 +2662,7 @@ self.get_price_kurort_SanatoriiZhuravushka = function(resident, already_client, 
 					self.dogovorGenerationCheck() // проверить наличие договора в 'Генерация'
 					self.openingChannelCheck() // проверить из какого канал открыта сделка
 					self.saveButton()	// кнопка сохранения
-					self.loadHiddenSanatorii()	// список скрываемых санаториев из админки
-					self.watchSanatoriiOptions()	// скрытие санаториев в списке выбора
+					self.loadHiddenSanatorii().then(self.renderHiddenSanatoriiStyle)	// скрытие санаториев из списка админки
 					self.statusOptionsBlock() // смена статуса сделки
 
 					if (!self.isAdmin()) {
