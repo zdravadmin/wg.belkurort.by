@@ -166,22 +166,6 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	$data['dog_adres_obekta_razmescheniya'] = $infoaboutsan[0]["address"];
 	$data['dog_chasy_zaezda_vyezda'] = $infoaboutsan[0]["timeinandout"];
 
-	if($data["sanid"] == 448619 and strtotime($data['data_zaezda']) > 1640984400) {
-		$data['dog_chasy_zaezda_vyezda'] = "заезд в первый день путёвки с 12:00, выезд в последний день путёвки до 10:00";
-	}
-
-	if($data["sanid"] == 464911 and strtotime($data['data_zaezda']) > 1641589200) {
-		$data['dog_chasy_zaezda_vyezda'] = "заезд с 8:00 первого дня путевки (первая услуга «завтрак»), выезд до 06:00 последнего дня путевки (последняя услуга «ужин» накануне дня выезда)";
-	}
-
-	if($data["sanid"] == 465157 and strtotime($data['data_zaezda']) > 1704067200) {
-		$data['dog_chasy_zaezda_vyezda'] = "заезд в первый день путёвки с 12:00, выезд в последний день путёвки до 10:00";
-	}
-
-	if($data["sanid"] == 437471 and strtotime($data['data_zaezda']) < 1706745600) {
-		$data['dog_chasy_zaezda_vyezda'] = "заезд в первый день путёвки с: 08:00, выезд в последний день путёвки до: 20:00";
-	}
-
 	// Если радуга и меньше чем на 3 дня, то генерируем дежурное меню
 	$isRadugaOn2Days = (($data["sanid"] == 454305) and ((strtotime($data['data_vyezda']) - strtotime($data['data_zaezda'])) < 259200));
 	if($isRadugaOn2Days) {
