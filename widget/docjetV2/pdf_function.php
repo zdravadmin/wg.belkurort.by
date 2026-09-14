@@ -3,22 +3,69 @@
 function getPdfUrl($filePath) {
   $domain = 'https://wg.belkurort.by/widget/docjetV2/';
 
-  $newFilePath = myOwnPdfConverter($filePath, $domain);
+  $mainError = '';
+  $newFilePath = myOwnPdfConverter($filePath, $domain, $mainError);
   if(!!$newFilePath) return $newFilePath;
-  writeError();
-  $newFilePath = iLovePdfConverter($filePath, $domain);
+  writeError($mainError);
+
+  $iLoveError = '';
+  $newFilePath = iLovePdfConverter($filePath, $domain, $iLoveError);
   if(!!$newFilePath) return $newFilePath;
-  $newFilePath = oldPdfConverter($filePath);
-  return $newFilePath;
+
+  $oldError = '';
+  $newFilePath = oldPdfConverter($filePath, $oldError);
+  if(!!$newFilePath) return $newFilePath;
+
+  // Сюда попадаем, только если не сработал ни один конвертер. Раньше в этом месте
+  // возвращался false, вызывающий код подставлял его в header('Location: ') или в
+  // file_get_contents() — пользователь получал пустую страницу, а на почту уходил
+  // пустой pdf. Дальше идти нельзя, показываем ошибку.
+  failPdfConversion($filePath, $mainError, $iLoveError, $oldError);
 }
 
-function writeError() {
+function failPdfConversion($filePath, $mainError = '', $iLoveError = '', $oldError = '') {
+  writeLogLine('Не сработал ни один конвертер, pdf не сформирован | файл: '.$filePath.
+               ' | основной: '.($mainError !== '' ? $mainError : 'нет данных').
+               ' | iLovePDF: '.($iLoveError !== '' ? $iLoveError : 'нет данных').
+               ' | старый: '.($oldError !== '' ? $oldError : 'нет данных'));
+  require_once __DIR__.'/src/error.php';
+  printError('Не удалось сконвертировать документ в PDF: сервис конвертации недоступен. '.
+             'Попробуйте ещё раз через минуту или выгрузите документ в .docx.');
+  exit;
+}
+
+function writeError($reason = '') {
+  $line = 'Документ был сгенерирован через доп конвертер';
+  if($reason !== '') $line .= ' | '.$reason;
+  writeLogLine($line);
+}
+
+function writeLogLine($line) {
   $fp = fopen('errorLogging.txt', 'a');
-  fwrite($fp, date("m.d.y").' - Документ был сгенерирован через доп конвертер' . PHP_EOL);
+  if(!$fp) return;
+  fwrite($fp, date("m.d.y H:i:s").' - '.$line . PHP_EOL);
   fclose($fp);
 }
 
-function myOwnPdfConverter($filePath, $domain) {
+function buildPdfUrl($domain, $path) {
+  // В имени файла есть пробелы, двоеточия и кириллица. И в заголовке Location,
+  // и в запросе к Яндекс.Диску адрес должен быть закодирован посегментно,
+  // иначе наружу уходят сырые UTF-8 байты
+  $parts = explode('/', $path);
+  foreach ($parts as $i => $part) {
+    $parts[$i] = rawurlencode($part);
+  }
+  return $domain.implode('/', $parts);
+}
+
+function shortenForLog($text, $length = 300) {
+  return str_replace(array("\r", "\n"), ' ', substr((string)$text, 0, $length));
+}
+
+function myOwnPdfConverter($filePath, $domain, &$error = null) {
+  $ch = null;
+  $httpCode = 0;
+  $contentType = '';
   try {
     $fileInfo = pathinfo($filePath);
     $convertToExt = 'pdf';
@@ -39,25 +86,41 @@ function myOwnPdfConverter($filePath, $domain) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type:application/json', 'Authorization: Bearer P2diCpAYQ3zxKaBW2IhuVSvs']);
     // //curl_setopt($ch, CURLOPT_HEADER, true); 
     // # Return response instead of printing.
+    // Без таймаутов зависший конвертер убивает скрипт по max_execution_time,
+    // и тогда в лог не попадает ничего: до записи причины дело не доходит.
+    // Обычный ответ укладывается в 3-4 с, так что запас здесь большой
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 45);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     $result = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
   
     if(!curl_errno($ch)) {
+      // Поведение не меняем, но помечаем в логе ответ, который не похож на pdf:
+      // такой ответ запишется в файл .pdf и откроется у пользователя битым
+      if($httpCode != 200 || stripos($contentType, 'pdf') === false) {
+        writeLogLine('Основной конвертер ответил не pdf | HTTP '.$httpCode.
+                     ' | Content-Type: '.$contentType.
+                     ' | файл: '.$filePath.
+                     ' | ответ: '.shortenForLog($result));
+      }
       $fh = fopen($newPath, 'w');
       fwrite($fh, $result);
       fclose($fh);
-      return $domain.$newPath;
+      return buildPdfUrl($domain, $newPath);
     } else {
-      throw new Exception('Not respond!');
+      throw new Exception('curl #'.curl_errno($ch).': '.curl_error($ch));
     }
   } catch(Exception $e) {
+    $error = 'основной конвертер упал: '.$e->getMessage().' | HTTP '.$httpCode.' | файл: '.$filePath;
     return false;
   } finally {
-    curl_close($ch);
+    if(is_resource($ch)) curl_close($ch);
   }
 }
 
-function oldPdfConverter($filePath) {
+function oldPdfConverter($filePath, &$error = null) {
   $fileinfo = pathinfo($filePath);
 	$path = $fileinfo['dirname'];
 	$filename = $fileinfo['filename'];
@@ -66,6 +129,11 @@ function oldPdfConverter($filePath) {
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_URL, $url);
+	// Хост принимает соединение, но не отвечает, поэтому одного CONNECTTIMEOUT мало:
+	// без CURLOPT_TIMEOUT запрос висит до max_execution_time, и всё это время
+	// пользователь смотрит в пустую страницу
+	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+	curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 
 	//Create a POST array with the file in it
 	$postData = array(
@@ -76,15 +144,23 @@ function oldPdfConverter($filePath) {
 
 	// Execute the request
 	$response = curl_exec($ch);
+	if(curl_errno($ch)) {
+		$error = 'старый конвертер упал: curl #'.curl_errno($ch).': '.curl_error($ch);
+		curl_close($ch);
+		return false;
+	}
+	curl_close($ch);
+	$rawResponse = $response;
 	$response = json_decode($response,true);
   if(!!$response and !$response["error"] and !!$response["pdf_link"]) {
     return $response["pdf_link"];
   } else {
+    $error = 'старый конвертер вернул не ссылку: '.shortenForLog($rawResponse);
     return false;
   }
 }
 
-function iLovePdfConverter($filePath, $domain) {
+function iLovePdfConverter($filePath, $domain, &$error = null) {
   try {
     $fileInfo = pathinfo($filePath);
     $newPath = 'wievDoc/'.$fileInfo['filename'].'.pdf';
@@ -98,8 +174,9 @@ function iLovePdfConverter($filePath, $domain) {
     $file1 = $myTaskConvertOffice->addFile($filePath);
     $myTaskConvertOffice->execute();
     $myTaskConvertOffice->download('wievDoc/');
-    return $domain.$newPath;
+    return buildPdfUrl($domain, $newPath);
   } catch(Exception $e) {
+    $error = 'iLovePDF упал: '.$e->getMessage().' | код: '.$e->getCode();
     return false;
   }
 }
