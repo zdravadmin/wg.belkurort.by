@@ -17,8 +17,11 @@ var CustomWidget = function () {
   self.putevkausers = [3449311, 3504832, 3406348, 3449308, 3449320, 12335137, 9567381, 7100445, 7974150]
   self.intervalsIds = []
   self.currentStatusId = (AMOCRM.data.current_card?.model?.defaults) ? AMOCRM.data.current_card.model.defaults['lead[STATUS]'] : 0
+  // model.defaults — снимок на момент загрузки, живой статус в model.attributes
   self.getStatusId = function () {
-    return AMOCRM.data.current_card.model?.defaults['lead[STATUS]']
+    const model = AMOCRM.data.current_card?.model
+    const status = model?.attributes?.['lead[STATUS]'] || model?.defaults?.['lead[STATUS]']
+    return (status === undefined || status === null) ? '' : String(status)
   },
   self.getPiplineId = function () {
       return AMOCRM.data.current_card.model.defaults['lead[PIPELINE_ID]']
@@ -639,6 +642,10 @@ var CustomWidget = function () {
       self.fields.controller()
       self.currentStatusId = self.getStatusId()
     },
+    self.statusPoller = function () {
+      if (self.currentStatusId == self.getStatusId()) return
+      self.statusChecker()
+    },
     self.IsJsonString = function (str) {
       try {
         JSON.parse(str);
@@ -749,8 +756,8 @@ var CustomWidget = function () {
             self.statusChecker();
           }
         })
-        // const intervalId = setInterval(self.statusChecker, 5000);
-        // self.intervalsIds.push(intervalId)
+        const intervalId = setInterval(self.statusPoller, 5000);
+        self.intervalsIds.push(intervalId)
       }
       return true;
     },
