@@ -69,6 +69,8 @@ if(sendEmail(explode(" ",$fio[0])[0]." ".explode(" ",$fio[0])[1], $manager_inser
 	require_once("../../auth.php");
 	$lead = $amo->lead;
 	$lead->addCustomField(305353, "https://mail.yandex.by/?uid=1130000038153703#search?request=Аннуляция".str_replace(" ","%20"," ".explode(" ",$fio[0])[0]." ".$data['dog_naimenovanie_obekta_razmescheniya']));
+	$lead->addCustomField(305351, "");
+	$lead->addCustomField(796948, false);
 	$lead->apiUpdate((int)$card_id, 'now');
 	//Пишем примечание к сделке о том что всё прошло успешно
 	create_note($card_id, 'Аннуляция сгенерирована и отправлена в '.$data['dog_naimenovanie_obekta_razmescheniya'], $manager);
