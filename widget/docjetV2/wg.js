@@ -264,6 +264,7 @@ var CustomWidget = function () {
       byGroupAndNotStatus: (groupsIds, statusesIds) => (self.showRules.byGroupId(groupsIds) && self.showRules.byNotStatuses(statusesIds)),
       byGroupAndPipelines: (groupsIds, pipelineIds) => (self.showRules.byGroupId(groupsIds) && self.showRules.byPiplines(pipelineIds)),
       isKvota: () => self.isKvota(),
+      byGroupAndStatusAndChecked: (groupsIds, statusesIds, CFid) => (self.showRules.byGroupAndStatus(groupsIds, statusesIds) && $(`input[name="CFV[${CFid}]"]`).is(':checked')),
     },
     self.carry = function (callback, arglist) {
       const thisObj = this;
@@ -482,9 +483,10 @@ var CustomWidget = function () {
         showRules: [self.carry(self.showRules.byGroupAndStatus, [[CLIENTS_MANAGERS_GROUP, ACCOUNTANT_GROUP], [142, 26726761]]),
         self.carry(self.showRules.byGroupAndNotStatus, [[BOSS_GROUP], []]),
         self.carry(self.showRules.byGroupAndPipelines, [[CLIENTS_MANAGERS_GROUP], [3836187]]),
-        self.carry(self.showRules.byGroupAndStatus, [[BUYERS_GROUP], [142, 26726761]])],
+        self.carry(self.showRules.byGroupAndStatus, [[BUYERS_GROUP], [142, 26726761]]),
+        self.carry(self.showRules.byGroupAndStatusAndChecked, [[SALES_MANAGERS_GROUP], [142], 797212])],
         validate: [
-          self.validationFunctions.hasEmptyCF, 
+          self.validationFunctions.hasEmptyCF,
           self.validationFunctions.mainPersonIsBelarus,
         ],
         buttons: function () {
@@ -752,7 +754,7 @@ var CustomWidget = function () {
       if (AMOCRM.widgets.system.area == "lcard") {
         document.getElementById('docget_docs_area').addEventListener("click", self.clickHandler);
         APP.data.current_card.model?.on('change', (model) => {
-          if(model.changed['lead[STATUS]'] || model.changed[`CFV[351975]`] !== undefined) {
+          if(model.changed['lead[STATUS]'] || model.changed[`CFV[351975]`] !== undefined || model.changed[`CFV[797212]`] !== undefined) {
             self.statusChecker();
           }
         })

@@ -9,7 +9,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
     var widgetname = 'Виджет гостей';
     self.system = self.system();
     self.isAcceptSave = () => {
-        return AMOCRM.data.current_card.getStatusId() !== 142 || !["group_0"].includes(currentUser.group);
+        return AMOCRM.data.current_card.getStatusId() !== 142 || !["group_0"].includes(currentUser.group) || $('input[name="CFV[797212]"]').is(':checked');
     }
     self.isRadonHealth = () => AMOCRM.data.current_card.model.defaults['CFV[305089]'] === "448583" && AMOCRM.data.current_card.model.defaults['CFV[305179]'] === '437579';
     self.sitizen = function(currentNational = '') {
