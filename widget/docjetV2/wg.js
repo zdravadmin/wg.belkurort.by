@@ -392,6 +392,7 @@ var CustomWidget = function () {
         self.carry(self.showRules.byGroupAndNotStatus, [[BOSS_GROUP], []]),
         self.carry(self.showRules.byGroupAndPipelines, [[CLIENTS_MANAGERS_GROUP], [3836187]]),
         // self.carry(self.showRules.byGroupAndStatus, [[BUYERS_GROUP], [142]]),
+        self.carry(self.showRules.byGroupAndStatusAndChecked, [[SALES_MANAGERS_GROUP], [142], 797212]),
         self.carry(self.showRules.byUsers, [[3449308]])],
         validate: [ self.validationFunctions.hasEmptyCFForRequest, 
                     self.validationFunctions.isVetlivaBook,
@@ -658,7 +659,10 @@ var CustomWidget = function () {
     }
   self.fields = {
     controller() {
-      if (this.coundition()) this.block_fields()
+      if (this.coundition()) {
+        this.block_fields()
+        if ($('input[name="CFV[797212]"]').is(':checked')) this.unblock_field($('[name="CFV[327491]"]'))
+      }
       if (this.notCoundition()) this.unblock_fields()
     },
     coundition() {
