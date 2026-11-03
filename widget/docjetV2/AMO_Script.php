@@ -164,7 +164,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 
 	$data['dog_naimenovanie_obekta_razmescheniya'] = $infoaboutsan[0]["type"]." '".$infoaboutsan[0]["name"]."'";
 	$data['dog_adres_obekta_razmescheniya'] = $infoaboutsan[0]["address"];
-	$data['dog_chasy_zaezda_vyezda'] = $infoaboutsan[0]["timeinandout"];
+	$data['dog_chasy_zaezda_vyezda'] = checkinTimeOn($infoaboutsan[0], $data['data_zaezda']);
 
 	// Если радуга и меньше чем на 3 дня, то генерируем дежурное меню
 	$isRadugaOn2Days = (($data["sanid"] == 454305) and ((strtotime($data['data_vyezda']) - strtotime($data['data_zaezda'])) < 259200));

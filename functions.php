@@ -444,11 +444,11 @@ function get_fcontent($url) {
   curl_close($curl_handle);
 }
 
-// Как Sanatorium::termUnit в админке: период с датами перекрывает бессрочный, нет term_units — dayorsut.
-function termUnitOn($san, $dateIn) {
-	$periods = json_decode(isset($san['term_units']) ? $san['term_units'] : '', true);
-	if(!is_array($periods) or count($periods) == 0) {
-		return $san['dayorsut'];
+// Как в админке: из подходящих по дате заезда периодов берём тот, у кого больше заполненных границ.
+function periodOn($json, $dateIn) {
+	$periods = json_decode((string)$json, true);
+	if(!is_array($periods)) {
+		return null;
 	}
 
 	$date = date('Y-m-d', strtotime($dateIn));
@@ -462,11 +462,34 @@ function termUnitOn($san, $dateIn) {
 		}
 		$bounds = ($start !== null ? 1 : 0) + ($end !== null ? 1 : 0);
 		if($bounds > $bestBounds) {
-			$best = $period['unit'];
+			$best = $period;
 			$bestBounds = $bounds;
 		}
 	}
 
-	return ($best === null) ? 'суток' : $best;
+	return $best;
+}
+
+function termUnitOn($san, $dateIn) {
+	$period = periodOn(isset($san['term_units']) ? $san['term_units'] : null, $dateIn);
+
+	return empty($period['unit']) ? 'суток' : $period['unit'];
+}
+
+// Как Sanatorium::checkinTime в админке.
+function checkinTimeOn($san, $dateIn) {
+	$period = periodOn(isset($san['checkin_times']) ? $san['checkin_times'] : null, $dateIn);
+	if($period === null) {
+		return '';
+	}
+
+	$in = !empty($period['time_in']) ? 'заезд в первый день путёвки с: '.$period['time_in'] : null;
+	$out = !empty($period['time_out']) ? 'выезд в последний день путёвки до: '.$period['time_out'] : null;
+	$note = isset($period['note']) ? trim($period['note']) : '';
+	$note = ($note === '') ? null : $note;
+
+	$parts = ($in !== null) ? array($in, $out, $note) : array($note, $out);
+
+	return implode(', ', array_filter($parts, function($part) { return $part !== null; }));
 }
 

@@ -20,14 +20,15 @@ if(isset($_REQUEST['sanid'])) {
 
 	if(isset($indb[0]) and !is_null($indb[0])) {
 		$indb = $indb[0];
-		
+		$checkin = !empty($_REQUEST['checkin']) ? $_REQUEST['checkin'] : 'today';
+
 		$outarr = array(
 		"error" => false,
 		"kind" => $indb['type'],
 		"name" => $indb['name'],
 		"address" => $indb['address'],
-		"denorsut" => termUnitOn($indb, !empty($_REQUEST['checkin']) ? $_REQUEST['checkin'] : 'today'),
-		"raschas" => $indb['timeinandout'],
+		"denorsut" => termUnitOn($indb, $checkin),
+		"raschas" => checkinTimeOn($indb, $checkin),
 		"food" => $food,
 		"stopSaleFrom" => $indb['stop_sale_from'],
 		);
