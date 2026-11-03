@@ -338,9 +338,7 @@ var RemoteGet = function () {
 			const checkIn = new Date(checkInField.val().replace(/(\d+).(\d+).(\d+)/, '$3/$2/$1'));
 			const checkOut = new Date(checkOutField.val().replace(/(\d+).(\d+).(\d+)/, '$3/$2/$1'));
 
-			if(denorsutField.val() == "") {
-				await self.settingSan();
-			}
+			await self.loadTermUnit();
 
 			const diff = Math.floor((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
@@ -354,18 +352,37 @@ var RemoteGet = function () {
 			return;
 		}
 
+		// Единица срока по периодам санатория на дату заезда
+		self.loadTermUnit = async function() {
+			const sanId = $('input[name="CFV[305089]"]').val();
+			const checkIn = $('input[name="CFV[305203]"]').val();
+			if (!sanId || !checkIn) return;
+
+			try {
+				const response = await fetch(`https://wg.belkurort.by/widget/infofound.php?sanid=${sanId}&checkin=${encodeURIComponent(checkIn)}`, {cache: 'no-cache'});
+				const result = await response.json();
+				const field = $('input[name="CFV[313433]"]');
+				if (result.denorsut && field.val() !== result.denorsut) {
+					field.val(result.denorsut).change();
+				}
+			} catch(e) {
+				console.error(e.message)
+			}
+		}
+
 		self.settingSan = async function() {
 			const sanId = $('input[name="CFV[305089]"]').val();
 			if (sanId == "") return;
 
+			const checkIn = $('input[name="CFV[305203]"]').val();
+
 			try {
-				const response = await fetch(`https://wg.belkurort.by/widget/infofound.php?sanid=${sanId}`, {
+				const response = await fetch(`https://wg.belkurort.by/widget/infofound.php?sanid=${sanId}&checkin=${encodeURIComponent(checkIn)}`, {
 					method: 'POST',
 					cache: 'no-cache',
 					body: {sanId}
 				});
 				const result = await response.json();
-				const checkIn = $('input[name="CFV[305203]"]').val();
 				let denOrSut = result.denorsut;
 
 				$('input[name="CFV[313433]"]').val(denOrSut).change();

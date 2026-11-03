@@ -12,19 +12,6 @@ do {
 $document = new PhpOffice\PhpWord\TemplateProcessor('templatesV2/booking_template.docx');
 
 
-if (strpos($data['dog_naimenovanie_obekta_razmescheniya'], "Ислочь") !== false) {
-  $outdate = "2025-12-25";
-  if($data['data_vyezda'] >= $outdate and strpos($data['sutki_dni'], "дн") !== false) {
-    $data['kolichestvo_dney'] = $data['kolichestvo_dney']-1;
-	if ($data['kolichestvo_dney'] == 1) {
-	    $data['sutki_dni'] = 'сутки';
-	}
-	if ($data['kolichestvo_dney'] != 1) {
-	    $data['sutki_dni'] = 'суток';
-	}
-  }
-}
-
 
 $document->setValue('today', date("d.m.Y"));
 $document->setValue('dog_naimenovanie_obekta_razmescheniya', $data['dog_naimenovanie_obekta_razmescheniya']);

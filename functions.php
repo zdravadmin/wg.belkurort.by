@@ -443,3 +443,30 @@ function get_fcontent($url) {
   $query = curl_exec($curl_handle);
   curl_close($curl_handle);
 }
+
+// Как Sanatorium::termUnit в админке: период с датами перекрывает бессрочный, нет term_units — dayorsut.
+function termUnitOn($san, $dateIn) {
+	$periods = json_decode(isset($san['term_units']) ? $san['term_units'] : '', true);
+	if(!is_array($periods) or count($periods) == 0) {
+		return $san['dayorsut'];
+	}
+
+	$date = date('Y-m-d', strtotime($dateIn));
+	$best = null;
+	$bestBounds = -1;
+	foreach($periods as $period) {
+		$start = isset($period['date_start']) ? $period['date_start'] : null;
+		$end = isset($period['date_end']) ? $period['date_end'] : null;
+		if(($start !== null and $start > $date) or ($end !== null and $end < $date)) {
+			continue;
+		}
+		$bounds = ($start !== null ? 1 : 0) + ($end !== null ? 1 : 0);
+		if($bounds > $bestBounds) {
+			$best = $period['unit'];
+			$bestBounds = $bounds;
+		}
+	}
+
+	return ($best === null) ? 'суток' : $best;
+}
+

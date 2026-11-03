@@ -13,19 +13,6 @@
 require_once 'src/autoload.php';
 
 
-if (strpos($data['dog_naimenovanie_obekta_razmescheniya'], "Ислочь") !== false) {
-  $outdate = "2025-12-25";
-  if($data['data_vyezda'] >= $outdate and strpos($data['sutki_dni'], "дн") !== false) {
-    $data['kolichestvo_dney'] = $data['kolichestvo_dney']-1;
-	if ($data['kolichestvo_dney'] == 1) {
-	    $data['sutki_dni'] = 'сутки';
-	}
-	if ($data['kolichestvo_dney'] != 1) {
-	    $data['sutki_dni'] = 'суток';
-	}
-  }
-}
-
 // $document = (date("m",strtotime($data['data_vyezda'])) < date("m",strtotime($data['data_zaezda']))) ? new PhpOffice\PhpWord\TemplateProcessor('templatesV2/booking_template_with_banket.docx') : new PhpOffice\PhpWord\TemplateProcessor('templatesV2/booking_template.docx'); //шаблон
 $document = new PhpOffice\PhpWord\TemplateProcessor('templatesV2/booking_template.docx');
 

@@ -26,19 +26,6 @@ if(date("m",strtotime($data['data_vyezda'])) < date("m",strtotime($data['data_za
 }
 
 
-if (strpos($data['dog_naimenovanie_obekta_razmescheniya'], "Ислочь") !== false) {
-  $outdate = "2025-12-25";
-  if($data['data_vyezda'] >= $outdate and strpos($data['sutki_dni'], "дн") !== false) {
-    $data['kolichestvo_dney'] = $data['kolichestvo_dney']-1;
-	if ($data['kolichestvo_dney'] == 1) {
-	    $data['sutki_dni'] = 'сутки';
-	}
-	if ($data['kolichestvo_dney'] != 1) {
-	    $data['sutki_dni'] = 'суток';
-	}
-  }
-}
-
 
 $document = new PhpOffice\PhpWord\TemplateProcessor($documentPath);
 $document->setValue('today', date("d.m.Y"));

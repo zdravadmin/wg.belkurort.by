@@ -173,7 +173,7 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	}
 
 	$data['email'] = $infoaboutsan[0]["email"];
-	$data['sutki_dni'] = $infoaboutsan[0]["dayorsut"];
+	$data['sutki_dni'] = termUnitOn($infoaboutsan[0], $data['data_zaezda']);
 	$data['san_country'] = $infoaboutsan[0]["country"];
 
 	$data['rb_spravka_covid'] = strtotime($data['data_zaezda']) > 1661979600 ? $infoaboutsan[0]["rb_spravka_covid"] : '';
@@ -470,22 +470,6 @@ function setCountDays($data) {
 
 	if($data["sanid"] == 448611 and isAllActiveGuestsHaveThisHealth($data['prilozhenie'], "Путёвка выходного дня")) {
 		$data['sutki_dni'] = "суток";
-	}
-
-	if($data["sanid"] == 464917 and time() > 1641589200) {
-    	$data['sutki_dni'] = "дней";
-  	}
-
-	if($data["sanid"] == 465157 and strtotime($data['data_zaezda']) < 1704067200) {
-    	$data['sutki_dni'] = "дней";
-  	}
-
-	if($data["sanid"] == 489531 and strtotime($data['data_zaezda']) < 1704067200) {
-		$data['sutki_dni'] = "дней";
-	}
-
-	if($data["sanid"] == 437471 and strtotime($data['data_zaezda']) < 1706745600) {
-		$data['sutki_dni'] = "дней";
 	}
 
 	if(stripos($data['sutki_dni'], "дн") === false) {

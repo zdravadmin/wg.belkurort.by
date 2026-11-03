@@ -26,7 +26,7 @@ if(isset($_REQUEST['sanid'])) {
 		"kind" => $indb['type'],
 		"name" => $indb['name'],
 		"address" => $indb['address'],
-		"denorsut" => $indb['dayorsut'],
+		"denorsut" => termUnitOn($indb, !empty($_REQUEST['checkin']) ? $_REQUEST['checkin'] : 'today'),
 		"raschas" => $indb['timeinandout'],
 		"food" => $food,
 		"stopSaleFrom" => $indb['stop_sale_from'],
