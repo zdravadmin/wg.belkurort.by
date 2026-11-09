@@ -274,6 +274,12 @@ var CustomWidget = function () {
     },
     self.docsObjects = [
       {
+        id: 'calc',
+        title: "Калькулятор",
+        showRules: [self.carry(self.showRules.byStatuses, [[26081350, 26081353]])],
+        buttons: () => [self.renderButton("Перейти", 'calc', 'calculator')]
+      },
+      {
         id: 1,
         title: "Договор",
         validate: [
@@ -502,6 +508,22 @@ var CustomWidget = function () {
         }
       }
     ],
+    self.cfvDate = function (CFid) {
+      const val = String(self.getCFV(CFid) || '').trim()
+      const m = val.match(/(\d{2})\.(\d{2})\.(\d{4})/)
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`
+      if (/^\d+$/.test(val)) return new Intl.DateTimeFormat('en-CA', {timeZone: 'Europe/Minsk'}).format(new Date(val * 1000))
+      return ''
+    },
+    self.openCalculator = function () {
+      const params = new URLSearchParams()
+      const add = (name, value) => value && params.append(`c[${name}]`, value)
+      add('in', self.cfvDate(305203))
+      add('out', self.cfvDate(305205))
+      add('sanatorium', self.getCFV(305089))
+      add('lead', AMOCRM.data.current_card.id)
+      window.open(`https://admin.belkurort.by/sanatorium-price-lists/calculator?${params}`, '_blank')
+    },
     self.renderButton = function (text, id, buttonType = 'pdf', openNewWindow = true) {
       return self.render({
         ref: '/tmpl/controls/button.twig'
@@ -535,6 +557,7 @@ var CustomWidget = function () {
     },
     self.clickHandler = async function (event) {
       const btn = event.target.closest('button')
+      if (btn?.dataset.docgetButtonType === 'calculator') return self.openCalculator()
       const docId = btn.closest('[data-doc-id]').dataset.docId
       if (btn) {
         let buttonId = btn.dataset.docgetId
