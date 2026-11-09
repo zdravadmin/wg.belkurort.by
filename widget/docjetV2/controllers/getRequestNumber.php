@@ -215,7 +215,7 @@ function countGuests($guests) {
 
   foreach($guests as $guest) {
     $filteredGoingGuestByNameAndCheckInOut = array_filter($guests, function($el) use ($guest) {
-      return $el["just_fio"] === $guest["just_fio"] and $el["guestcheckout"] == $guest["guestcheckin"]; 
+      return mb_strtolower(trim($el["just_fio"])) === mb_strtolower(trim($guest["just_fio"])) and $el["guestcheckout"] == $guest["guestcheckin"]; 
     });
     if(count($filteredGoingGuestByNameAndCheckInOut) == 0) {
       $kolichestvo_turistov++;

@@ -604,7 +604,7 @@ function getPrilozhenieDB($lead, $checkin, $checkout){
 				
 				$filteredGoingGuestByNameAndCheckInOut = array_filter($going, function($el) use ($man) {
 					// return $el["just_fio"] === $man["fio"] and $el["guestcheckout"] == $man["guestcheckin"]; 
-					return $el["just_fio"] === $man["fio"] and strtotime($el["guestcheckout"]) >= (strtotime($man["guestcheckin"])- 60 * 60 * 24) and $el['birthday'] === $man['birthday'];
+					return mb_strtolower(trim($el["just_fio"])) === mb_strtolower(trim($man["fio"])) and strtotime($el["guestcheckout"]) >= (strtotime($man["guestcheckin"])- 60 * 60 * 24) and $el['birthday'] === $man['birthday'];
 				});
 				if(count($filteredGoingGuestByNameAndCheckInOut) == 0) {
 					$kolichestvo_turistov++;
