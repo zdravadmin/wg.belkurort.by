@@ -209,11 +209,9 @@ var RemoteGet = function () {
 
 			mutationObserver.observe(document.documentElement, {
 				attributes: true,
-				characterData: true,
+				attributeFilter: ['class'],
 				childList: true,
-				subtree: true,
-				attributeOldValue: true,
-				characterDataOldValue: true
+				subtree: true
 			});
 
 			self.observers.push(mutationObserver);
@@ -306,9 +304,13 @@ var RemoteGet = function () {
 			}
 			var ekvairing = (oplata == 437557) ? Math.round(((costUsl * 100 / q) - costUsl)) : 0;
 
-			$("input[name='CFV[305139]']").val(Math.round(ekvairing)).change();
-			$("input[name='CFV[305169]']").val(Math.round(costUsl + ekvairing)).change();
-			$("input[name='CFV[305337]']").val(Math.round(costUsl)).change();
+			const setVal = (id, v) => {
+				const $f = $(`input[name='CFV[${id}]']`);
+				if ($f.val() != v) $f.val(v).change();
+			};
+			setVal(305139, Math.round(ekvairing));
+			setVal(305169, Math.round(costUsl + ekvairing));
+			setVal(305337, Math.round(costUsl));
 
 			//self.mandatoryComission.setComission()
 			//Получаем валюту
@@ -1666,14 +1668,12 @@ var RemoteGet = function () {
 						});
 					});
 
-					$("input[name='CFV[305139]']").change(() => { $('[name="CFV[305169]"]').val(Number($('[name="CFV[305337]"]').val()) + Number($('[name="CFV[305139]"]').val())).change() });
 					$("input[name='CFV[305173]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении способа оплаты
 
 					$("input[name='CFV[305095]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Стоимость санатория
 					$("input[name='CFV[305091]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Туробслуживание
 					$("input[name='CFV[305093]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Инфоуслуги
 					$("input[name='CFV[305137]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Трансфер
-					$("input[name='CFV[305139]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Эквайринг
 
 					$("input[name='CFV[305195]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Количество туристов
 					$("input[name='CFV[313133]']").on('change', function () { self.timedRaschetCen() }); //изменяем просчёт при изменении Количество дней
