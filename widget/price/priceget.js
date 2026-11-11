@@ -19,12 +19,11 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 		self.hiddenSanatoriiTtl = 5 * 60 * 1000;
 		self.hiddenSanatoriiLoadedAt = 0;
 		self.hiddenSanatoriiRequest = null;
-		self.extraServicePrices = {};
+		self.extraServicePrices = null;
 		self.extraServicePricesUrl = 'https://admin.belkurort.by/api/widget/extra-service-prices';
 		self.extraServicePricesTtl = 15 * 60 * 1000;
-		self.extraServicePricesLoadedAt = 0;
-		self.extraServicePricesRequest = null;
-		self.extraServicePricesStorageKey = 'wg-extra-service-prices';
+		self.extraServicePricesRequests = {};
+		self.extraServicePricesStorageKey = 'wg-extra-service-prices-by-date';
 		self.currency = {
 			innerCurs: {},
 			getInnerCurs: async function (date = new Date()) {
@@ -705,49 +704,53 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 				const json = await response.json();
 			}
 
-			// цены правят в админке — держим их в localStorage и перечитываем не чаще раза в extraServicePricesTtl,
-			// чтобы и после F5 не ходить за ними снова
-			self.loadExtraServicePrices = function () {
-				if(!self.extraServicePricesLoadedAt) {
+			// цены зависят от периода, в который попадает дата заезда (Y-m-d, '' — без даты): держим их
+			// в localStorage по датам и перечитываем не чаще раза в extraServicePricesTtl
+			self.loadExtraServicePrices = function (date = '') {
+				if(!self.extraServicePrices) {
 					try {
-						const saved = JSON.parse(localStorage.getItem(self.extraServicePricesStorageKey));
-						if(saved?.prices) {
-							self.extraServicePrices = saved.prices;
-							self.extraServicePricesLoadedAt = saved.loadedAt;
-						}
-					} catch (e) {}
+						self.extraServicePrices = JSON.parse(localStorage.getItem(self.extraServicePricesStorageKey)) || {};
+					} catch (e) {
+						self.extraServicePrices = {};
+					}
 				}
 
-				if(Date.now() - self.extraServicePricesLoadedAt < self.extraServicePricesTtl)
-					return Promise.resolve(self.extraServicePrices);
+				const saved = self.extraServicePrices[date];
+				if(saved && Date.now() - saved.loadedAt < self.extraServicePricesTtl)
+					return Promise.resolve(saved.prices);
 
-				if(self.extraServicePricesRequest) return self.extraServicePricesRequest;
+				if(self.extraServicePricesRequests[date]) return self.extraServicePricesRequests[date];
 
-				self.extraServicePricesRequest = fetch(self.extraServicePricesUrl, { cache: 'no-cache' })
+				const url = self.extraServicePricesUrl + (date ? '?date=' + date : '');
+				self.extraServicePricesRequests[date] = fetch(url, { cache: 'no-cache' })
 					.then(response => {
 						if(!response.ok) throw new Error('HTTP ' + response.status);
 						return response.json();
 					})
 					.then(prices => {
-						self.extraServicePrices = prices;
-						self.extraServicePricesLoadedAt = Date.now();
+						const now = Date.now();
+						for(const key in self.extraServicePrices)
+							if(now - self.extraServicePrices[key].loadedAt >= self.extraServicePricesTtl) delete self.extraServicePrices[key];
+						self.extraServicePrices[date] = { prices, loadedAt: now };
 						try {
-							localStorage.setItem(self.extraServicePricesStorageKey, JSON.stringify({ prices, loadedAt: self.extraServicePricesLoadedAt }));
+							localStorage.setItem(self.extraServicePricesStorageKey, JSON.stringify(self.extraServicePrices));
 						} catch (e) {}
 						return prices;
 					})
 					.catch(e => {
-						// сервер не ответил — оставляем последние удачно загруженные цены
+						// сервер не ответил — оставляем последние удачно загруженные цены на эту дату
 						console.log('extra-service-prices:', e);
-						return self.extraServicePrices;
+						return saved?.prices;
 					})
-					.finally(() => { self.extraServicePricesRequest = null; });
+					.finally(() => { delete self.extraServicePricesRequests[date]; });
 
-				return self.extraServicePricesRequest;
+				return self.extraServicePricesRequests[date];
 			}
 
 			self.setAllComissions = async function (dv, already_client) {
-				const prices = (await self.loadExtraServicePrices())?.[$('[name="CFV[305089]"]').val()];
+				const checkIn = ($('[name="CFV[305203]"]').val() || '').match(/(\d{2})\.(\d{2})\.(\d{4})/);
+				const date = checkIn ? `${checkIn[3]}-${checkIn[2]}-${checkIn[1]}` : '';
+				const prices = (await self.loadExtraServicePrices(date))?.[$('[name="CFV[305089]"]').val()];
 				const price = field => prices?.[field]?.[dv]?.[already_client ? 1 : 0];
 				const tourService = price(305091);
 				const infoService = price(305093);
