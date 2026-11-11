@@ -2,6 +2,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 var CustomWidget = function () {
   var self = this
   const TOKEN = 'nYK4dxa{bFQoQEEq%AibWTrW'
+  const REVIEW_API_TOKEN = '0b96710c912225a447183b970b2515ec2d389f27541bc028'
   const BOSS_GROUP = 237814
   const SALES_MANAGERS_GROUP = 0
   const CLIENTS_MANAGERS_GROUP = 239857
@@ -280,6 +281,12 @@ var CustomWidget = function () {
         buttons: () => [self.renderButton("Перейти", 'calc', 'calculator')]
       },
       {
+        id: 'review',
+        title: "Отзывы",
+        showRules: [self.carry(self.showRules.byStatuses, [[142]])],
+        buttons: () => [self.renderButton("Скопировать", 'review', 'review')]
+      },
+      {
         id: 1,
         title: "Договор",
         validate: [
@@ -524,6 +531,28 @@ var CustomWidget = function () {
       add('lead', AMOCRM.data.current_card.id)
       window.open(`https://admin.belkurort.by/sanatorium-price-lists/calculator?${params}`, '_blank')
     },
+    self.copyReviewText = async function (btn) {
+      const params = new URLSearchParams({lead: AMOCRM.data.current_card.id})
+      self.getCFV(305089) && params.append('sanatorium', self.getCFV(305089))
+      const label = btn.querySelector('.button-input-inner__text')
+      const fail = text => self.addModal(self.modalData($('<div>').text(text).html(), false))
+      $('body').addClass('page-loading')
+      try {
+        const response = await fetch(`https://admin.belkurort.by/api/review-text?${params}`, {
+          headers: {'Authorization': `Bearer ${REVIEW_API_TOKEN}`, 'Accept': 'application/json'}
+        })
+        const json = await response.json()
+        if (!response.ok) return fail(json.error || 'Не удалось получить текст отзыва')
+        await navigator.clipboard.writeText(json.text)
+        const text = label.textContent
+        label.textContent = 'Скопировано'
+        setTimeout(() => label.textContent = text, 2000)
+      } catch (e) {
+        fail('Не удалось скопировать текст отзыва. Повторите ещё раз!')
+      } finally {
+        $('body').removeClass('page-loading')
+      }
+    },
     self.renderButton = function (text, id, buttonType = 'pdf', openNewWindow = true) {
       return self.render({
         ref: '/tmpl/controls/button.twig'
@@ -558,6 +587,7 @@ var CustomWidget = function () {
     self.clickHandler = async function (event) {
       const btn = event.target.closest('button')
       if (btn?.dataset.docgetButtonType === 'calculator') return self.openCalculator()
+      if (btn?.dataset.docgetButtonType === 'review') return self.copyReviewText(btn)
       const docId = btn.closest('[data-doc-id]').dataset.docId
       if (btn) {
         let buttonId = btn.dataset.docgetId
