@@ -6,7 +6,7 @@ var CustomWidget = function () {
 	self.showdog = [3406348, 3504832, 3449320, 12335137];
 	self.putevkausers = [3449311, 3504832, 3406348, 3449308, 3449320, 12335137];
 	self.card_info = {};
-	self.validFields = [305285, 305195, 305287, 305337, 305333, 305091, 305093, 305095, 305203, 305205, 305323, 313885, 305139, 305179, 313133, 339925];
+	self.validFields = [305285, 305195, 305287, 305337, 305333, 305091, 305093, 305095, 305203, 305205, 305323, 313885, 305179, 313133, 339925];
 	self.modalData = function (t, flag) {
 		let tex = '<div class="modal-body__inner" style="text-align: center;"><span class="modal-body__close"><span class="icon icon-modal-close"></span></span><span class="modal-body__close"><span class="icon icon-modal-close"></span></span>';
 		if (flag == true) {
