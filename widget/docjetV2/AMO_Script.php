@@ -62,7 +62,8 @@ if (isset($_GET['card_id']) && isset($_GET['card_type']) && isset($_GET['doc']) 
 	$isOpenBookAfterSeptemberSending = false;
 
 	// вычисляем количество дней и часов для оплаты
-	$data['due_days'] = 3;
+	$data['due_days'] = getWorkDays($data['hypot_date_pay']);
+	$data['due_days'] = $data['due_days'] <= 3 ? $data['due_days'] : 3;
 	// Если дата договора среда, а заезд в ближайшие выходные или понедельник, то даём 2 дня на оплату
 	$data['due_days'] = isNeedChangeDueDays($data['data_dogovora'], $data['data_zaezda']) ? 2 : $data['due_days'];
 	$data['due_hours'] = $data['due_days']*24;
@@ -930,6 +931,24 @@ function find_kurs($cur) {
 		return $result;	
 	}
 	
+	function getWorkDays($date) {
+		$now = DateTime::createFromFormat("Y-m-d", date('Y-m-d',time()));
+		$datetime1 = DateTime::createFromFormat("Y-m-d", date('Y-m-d',time()));
+		$datetime2 = DateTime::createFromFormat("Y-m-d", date('Y-m-d',strtotime($date)));
+		$interval = $datetime1->diff($datetime2);
+		$woweekends = 0;
+
+		for($i=0; $i<=$interval->days; $i++){
+			   
+			   $weekday = $datetime1->format('w');
+				if($weekday != 0 && $weekday != 6){ // 0 for Sunday and 6 for Saturday
+				   $woweekends++;  
+				}
+				$modif = $datetime1->modify('+1 day');
+		}
+		return ($woweekends > 1 and $now < $datetime2) ? $woweekends : 1;
+	}
+
 	function getNDSFraza($value, $valuta) {
 		// global $isWithTax;
 		if($value == null) return ', без НДС';
