@@ -2,7 +2,7 @@ define(['jquery','lib/components/base/modal'], function($, Modal) {
 var CustomWidget = function () {
   var self = this
   const TOKEN = 'nYK4dxa{bFQoQEEq%AibWTrW'
-  const REVIEW_API_TOKEN = '0b96710c912225a447183b970b2515ec2d389f27541bc028'
+  const ADMIN_API_TOKEN = '0b96710c912225a447183b970b2515ec2d389f27541bc028'
   const BOSS_GROUP = 237814
   const SALES_MANAGERS_GROUP = 0
   const CLIENTS_MANAGERS_GROUP = 239857
@@ -278,7 +278,11 @@ var CustomWidget = function () {
         id: 'calc',
         title: "Калькулятор",
         showRules: [self.carry(self.showRules.byStatuses, [[26081350, 26081353]])],
-        buttons: () => [self.renderButton("Перейти", 'calc', 'calculator')]
+        buttons: () => [
+          self.renderButton("Перейти", 'calc', 'calculator', true, 'Открыть калькулятор с датами и санаторием из сделки'),
+          self.renderButton("В КП", 'calc', 'proposal-open', true, 'Открыть последнее КП по сделке. Отметка «Клиент открыл КП» при этом не ставится'),
+          self.renderButton("КП текстом", 'calc', 'proposal-text', true, 'Скопировать последнее КП по сделке в буфер обмена текстом')
+        ]
       },
       {
         id: 'review',
@@ -531,6 +535,41 @@ var CustomWidget = function () {
       add('lead', AMOCRM.data.current_card.id)
       window.open(`https://admin.belkurort.by/sanatorium-price-lists/calculator?${params}`, '_blank')
     },
+    self.adminApi = async function (path) {
+      const params = new URLSearchParams({lead: AMOCRM.data.current_card.id})
+      const response = await fetch(`https://admin.belkurort.by/api/${path}?${params}`, {
+        headers: {'Authorization': `Bearer ${ADMIN_API_TOKEN}`, 'Accept': 'application/json'}
+      }).catch(() => { throw new Error('Админка не отвечает. Повторите ещё раз!') })
+      const json = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(json.error || 'Не удалось получить КП')
+      return json
+    },
+    self.showError = text => self.addModal(self.modalData($('<div>').text(text).html(), false)),
+    self.openProposal = async function () {
+      const win = window.open('', '_blank')
+      try {
+        const {url} = await self.adminApi('widget/proposal-link')
+        win.location = url
+      } catch (e) {
+        win.close()
+        self.showError(e.message)
+      }
+    },
+    self.copyProposalText = async function (btn) {
+      const label = btn.querySelector('.button-input-inner__text')
+      $('body').addClass('page-loading')
+      try {
+        const {text} = await self.adminApi('widget/proposal-text')
+        await navigator.clipboard.writeText(text)
+        const original = label.textContent
+        label.textContent = 'Скопировано'
+        setTimeout(() => label.textContent = original, 2000)
+      } catch (e) {
+        self.showError(e.message)
+      } finally {
+        $('body').removeClass('page-loading')
+      }
+    },
     self.copyReviewText = async function (btn) {
       const params = new URLSearchParams({lead: AMOCRM.data.current_card.id})
       self.getCFV(305089) && params.append('sanatorium', self.getCFV(305089))
@@ -539,7 +578,7 @@ var CustomWidget = function () {
       $('body').addClass('page-loading')
       try {
         const response = await fetch(`https://admin.belkurort.by/api/review-text?${params}`, {
-          headers: {'Authorization': `Bearer ${REVIEW_API_TOKEN}`, 'Accept': 'application/json'}
+          headers: {'Authorization': `Bearer ${ADMIN_API_TOKEN}`, 'Accept': 'application/json'}
         })
         const json = await response.json()
         if (!response.ok) return fail(json.error || 'Не удалось получить текст отзыва')
@@ -553,14 +592,14 @@ var CustomWidget = function () {
         $('body').removeClass('page-loading')
       }
     },
-    self.renderButton = function (text, id, buttonType = 'pdf', openNewWindow = true) {
+    self.renderButton = function (text, id, buttonType = 'pdf', openNewWindow = true, title = '') {
       return self.render({
         ref: '/tmpl/controls/button.twig'
       }, {
         text,
         class_name: 'docget_subs_w',
         id: `docget_button_dog${id}${Math.floor(Math.random() * 50)}`,
-        additional_data: `data-docget-button-type=${buttonType} data-docget-id=${id} data-docget-open-new-window=${openNewWindow}`
+        additional_data: `data-docget-button-type=${buttonType} data-docget-id=${id} data-docget-open-new-window=${openNewWindow}${title && ` title="${title}"`}`
       })
     },
     self.makeLines = function () {
@@ -587,6 +626,8 @@ var CustomWidget = function () {
     self.clickHandler = async function (event) {
       const btn = event.target.closest('button')
       if (btn?.dataset.docgetButtonType === 'calculator') return self.openCalculator()
+      if (btn?.dataset.docgetButtonType === 'proposal-open') return self.openProposal()
+      if (btn?.dataset.docgetButtonType === 'proposal-text') return self.copyProposalText(btn)
       if (btn?.dataset.docgetButtonType === 'review') return self.copyReviewText(btn)
       const docId = btn.closest('[data-doc-id]').dataset.docId
       if (btn) {
