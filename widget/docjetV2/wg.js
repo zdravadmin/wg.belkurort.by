@@ -285,6 +285,10 @@ var CustomWidget = function () {
         ]
       },
       {
+        id: 'replies',
+        render: () => self.replies.render()
+      },
+      {
         id: 'review',
         title: "Отзывы",
         showRules: [self.carry(self.showRules.byStatuses, [[142]])],
@@ -592,6 +596,307 @@ var CustomWidget = function () {
         $('body').removeClass('page-loading')
       }
     },
+    self.escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]),
+    self.plural = (n, one, few, many) => {
+      const n10 = n % 10, n100 = n % 100
+      if (n10 === 1 && n100 !== 11) return one
+      return (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) ? few : many
+    },
+    // Шаблоны ответов авторизованного менеджера: кеш в localStorage, маски подставляются из карточки при клике
+    self.replies = {
+      VISIBLE: 6,
+      EMPTY_TTL: 3600 * 1000,
+      MASK: /\{[а-яё]+\}/giu,
+      state: {userId: null, status: 'idle', templates: [], values: {}, error: '', refreshing: false, expanded: false, notice: null, copying: null},
+      managerId() {
+        const id = String(self.userId ?? '')
+        return /^\d+$/.test(id) ? id : null
+      },
+      cacheKey: userId => `reply-templates:${userId}`,
+      readCache(userId) {
+        try {
+          const cached = JSON.parse(localStorage.getItem(this.cacheKey(userId)))
+          if (!cached || typeof cached.savedAt !== 'number' || !Array.isArray(cached.templates)) return null
+          if (!cached.templates.length && Date.now() - cached.savedAt > this.EMPTY_TTL) return null
+          return this.normalize(cached)
+        } catch (e) {
+          return null
+        }
+      },
+      writeCache(userId, {templates, values}) {
+        try {
+          localStorage.setItem(this.cacheKey(userId), JSON.stringify({savedAt: Date.now(), templates, values}))
+        } catch (e) {}
+      },
+      normalize(json) {
+        const templates = json.templates
+          .filter(t => t && typeof t.text === 'string' && t.text.trim() !== '')
+          .map(t => ({
+            title: typeof t.title === 'string' ? t.title.trim() : '',
+            text: t.text,
+            statuses: (Array.isArray(t.statuses) ? t.statuses : []).map(String).filter(s => /^\d+$/.test(s))
+          }))
+        const values = {}
+        for (const [mask, value] of Object.entries(json.values && typeof json.values === 'object' ? json.values : {})) {
+          if (typeof value === 'string' && value.trim() !== '') values[mask.toLowerCase()] = value
+        }
+        return {templates, values}
+      },
+      async request(path, params, timeout = 15000) {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), timeout)
+        try {
+          const response = await fetch(`https://admin.belkurort.by/api/widget/${path}?${new URLSearchParams(params)}`, {
+            headers: {'Authorization': `Bearer ${ADMIN_API_TOKEN}`, 'Accept': 'application/json'},
+            signal: controller.signal
+          }).catch(() => { throw new Error('админка не отвечает, проверьте интернет') })
+          const json = await response.json().catch(() => ({}))
+          return {status: response.status, json: json && typeof json === 'object' ? json : {}}
+        } finally {
+          clearTimeout(timer)
+        }
+      },
+      async amoGet(path) {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 10000)
+        try {
+          const response = await fetch(path, {headers: {'Accept': 'application/json'}, credentials: 'same-origin', signal: controller.signal})
+          if (!response.ok) throw new Error(`amo ${response.status}`)
+          return await response.json()
+        } finally {
+          clearTimeout(timer)
+        }
+      },
+      ensure() {
+        const userId = this.managerId()
+        if (userId === this.state.userId) return
+        clearTimeout(this.noticeTimer)
+        Object.assign(this.state, {userId, status: 'idle', templates: [], values: {}, error: '', refreshing: false, expanded: false, notice: null, copying: null})
+        if (!userId) return
+        const cached = this.readCache(userId)
+        cached ? this.setData(cached) : this.load()
+      },
+      setData({templates, values}) {
+        Object.assign(this.state, {templates, values, error: '', status: templates.length ? 'ready' : 'hidden'})
+      },
+      async load() {
+        const {state} = this
+        const userId = state.userId
+        if (!userId || state.refreshing) return
+        const hadTemplates = state.status === 'ready'
+        state.refreshing = true
+        if (!hadTemplates) state.status = 'loading'
+        this.update()
+        let failure = null
+        try {
+          const {status, json} = await this.request('reply-templates', {user: userId})
+          if (state.userId !== userId) return
+          if (status === 404 || (status === 200 && Array.isArray(json.templates))) {
+            const data = status === 404 ? {templates: [], values: {}} : this.normalize(json)
+            this.writeCache(userId, data)
+            this.setData(data)
+          } else {
+            failure = json.error || `админка ответила ошибкой ${status}`
+          }
+        } catch (e) {
+          failure = e.message
+        }
+        if (state.userId !== userId) return
+        state.refreshing = false
+        if (failure && hadTemplates) return this.notify('error', `Не удалось обновить шаблоны: ${failure}`)
+        if (failure) Object.assign(state, {status: 'error', error: failure})
+        this.update()
+      },
+      syncFromStorage(event) {
+        const {userId} = this.state
+        if (!userId || event.key !== this.cacheKey(userId) || this.state.refreshing) return
+        const cached = this.readCache(userId)
+        if (cached) {
+          this.setData(cached)
+          this.update()
+        }
+      },
+      notify(type, text) {
+        clearTimeout(this.noticeTimer)
+        this.state.notice = {type, text}
+        this.noticeTimer = setTimeout(() => {
+          this.state.notice = null
+          this.update()
+        }, type === 'ok' ? 3000 : 12000)
+        this.update()
+      },
+      ordered() {
+        const status = String(self.getStatusId())
+        const stage = [], common = [], other = []
+        this.state.templates.forEach((t, index) => {
+          if (!t.statuses.length) common.push({...t, index})
+          else if (t.statuses.includes(status)) stage.push({...t, index})
+          else other.push({...t, index, dim: true})
+        })
+        const main = [...stage, ...common]
+        return {visible: main.slice(0, this.VISIBLE), rest: [...main.slice(this.VISIBLE), ...other]}
+      },
+      button(text, type, attrs = '', cls = '') {
+        return `<button type="button" class="button-input docget_subs_w ${cls}" data-docget-button-type="${type}" ${attrs}><span class="button-input-inner"><span class="button-input-inner__text">${self.escapeHtml(text)}</span></span></button>`
+      },
+      templateButton(t) {
+        const label = t.title || t.text.replace(/\s+/g, ' ').trim().slice(0, 40)
+        const hint = t.text.length > 200 ? `${t.text.slice(0, 200)}…` : t.text
+        const cls = `docget_replies__template${t.dim ? ' is-dim' : ''}${this.state.copying === t.index ? ' is-busy' : ''}`
+        return this.button(label, 'reply-template', `data-index="${t.index}" title="${self.escapeHtml(hint)}"`, cls)
+      },
+      render() {
+        this.ensure()
+        const {state} = this
+        if (!['loading', 'ready', 'error'].includes(state.status)) return '<div id="docget_replies" hidden></div>'
+        let body
+        if (state.status === 'loading') {
+          body = '<div class="docget_replies__hint">Загрузка…</div>'
+        } else if (state.status === 'error') {
+          body = `<div class="docget_replies__hint">Не удалось загрузить шаблоны: ${self.escapeHtml(state.error)}</div>${this.button('Повторить', 'reply-retry')}`
+        } else {
+          const {visible, rest} = this.ordered()
+          body = (state.expanded ? [...visible, ...rest] : visible).map(t => this.templateButton(t)).join('')
+          if (rest.length) body += this.button(state.expanded ? 'Свернуть' : `Ещё ${rest.length}`, 'reply-more', '', 'docget_replies__more')
+        }
+        const notice = state.notice ? `<div class="docget_replies__notice docget_replies__notice_${state.notice.type}">${self.escapeHtml(state.notice.text)}</div>` : ''
+        const refresh = `<button type="button" class="docget_replies__refresh${state.refreshing ? ' is-spinning' : ''}" data-docget-button-type="reply-refresh" title="Обновить шаблоны"${state.refreshing ? ' disabled' : ''}>↻</button>`
+        return `<div class="docget_line_button docget_replies" id="docget_replies">
+                  <div class="docget_replies__head"><span>Шаблоны ответов</span>${refresh}</div>
+                  ${body}${notice}
+                </div>`
+      },
+      update() {
+        const el = document.getElementById('docget_replies')
+        if (el) el.outerHTML = this.render()
+      },
+      click(btn) {
+        const type = btn.dataset.docgetButtonType
+        if (type === 'reply-refresh' || type === 'reply-retry') return this.load()
+        if (type === 'reply-template') return this.copy(Number(btn.dataset.index))
+        if (type === 'reply-more') {
+          this.state.expanded = !this.state.expanded
+          this.update()
+        }
+      },
+      firstName(fullName) {
+        let name = String(fullName || '')
+        const afterNote = name.slice(name.lastIndexOf(':') + 1)
+        if (afterNote.trim()) name = afterNote
+        const words = name.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+          .split(/[\s,]+/)
+          .map(w => w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, ''))
+          .filter(Boolean)
+        if (!words.length) return null
+        const patronymic = words.findIndex((w, i) => i > 0 && /(вич|вна|ична|чна|ич|оглы|кызы)$/iu.test(w))
+        return words[patronymic > 0 ? patronymic - 1 : 0]
+      },
+      async clientName() {
+        const lead = AMOCRM.data.current_card?.id
+        if (!lead) return null
+        try {
+          const contacts = (await this.amoGet(`/api/v4/leads/${lead}?with=contacts`))?._embedded?.contacts || []
+          const main = contacts.find(c => c.is_main) || contacts[0]
+          return main ? this.firstName((await this.amoGet(`/api/v4/contacts/${main.id}`))?.name) : null
+        } catch (e) {
+          return null
+        }
+      },
+      async proposalUrl() {
+        const lead = AMOCRM.data.current_card?.id
+        if (!lead) return null
+        try {
+          const {status, json} = await this.request('reply-templates/proposal', {lead})
+          return status === 200 && typeof json.url === 'string' && /^https?:\/\//.test(json.url) ? json.url : null
+        } catch (e) {
+          return null
+        }
+      },
+      sanatorium() {
+        const $input = $('[name="CFV[305089]"]')
+        const value = String($input.val() || '')
+        if (!/^\d+$/.test(value)) return null
+        const item = $input.closest('.control--select').find(`.control--select--list--item[data-value="${value}"]`).first().text().trim()
+        return item || $input.parent().find('button span').first().text().trim() || null
+      },
+      cardValues() {
+        const date = id => {
+          const iso = self.cfvDate(id)
+          return iso ? iso.split('-').reverse().join('.') : null
+        }
+        const days = parseInt(self.getCFV(313133), 10)
+        return {
+          '{заезд}': date(305203),
+          '{выезд}': date(305205),
+          '{срок}': days > 0 ? `${days} ${self.plural(days, 'день', 'дня', 'дней')}` : null,
+          '{санаторий}': this.sanatorium()
+        }
+      },
+      async writeClipboard(text) {
+        try {
+          await navigator.clipboard.writeText(text)
+          return true
+        } catch (e) {}
+        const area = document.createElement('textarea')
+        area.value = text
+        area.setAttribute('readonly', '')
+        area.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+        document.body.appendChild(area)
+        area.select()
+        try {
+          return document.execCommand('copy')
+        } catch (e) {
+          return false
+        } finally {
+          area.remove()
+        }
+      },
+      showManualCopy(text) {
+        self.addModal(`<div class="modal-body__inner">
+                         <span class="modal-body__close"><span class="icon icon-modal-close"></span></span>
+                         <h2 class="modal-body__caption head_2">Скопируйте текст</h2>
+                         <p>Браузер не дал доступ к буферу обмена: текст выделен, нажмите Ctrl+C.</p>
+                         <textarea id="docget_replies_manual" readonly style="width:100%;min-height:180px;box-sizing:border-box;margin-top:8px;font:inherit">${self.escapeHtml(text)}</textarea>
+                       </div>`)
+        setTimeout(() => {
+          const area = document.getElementById('docget_replies_manual')
+          area?.focus()
+          area?.select()
+        }, 50)
+      },
+      async copy(index) {
+        const {state} = this
+        const template = state.templates[index]
+        if (!template || state.copying !== null) return
+        state.copying = index
+        this.update()
+        try {
+          const masks = new Set((template.text.match(this.MASK) || []).map(m => m.toLowerCase()))
+          const [proposal, name] = await Promise.all([
+            masks.has('{кп}') ? this.proposalUrl() : null,
+            masks.has('{имя}') ? this.clientName() : null
+          ])
+          const values = {...state.values, ...this.cardValues(), '{имя}': name, '{кп}': proposal}
+          const text = template.text.replace(this.MASK, m => {
+            const value = values[m.toLowerCase()]
+            return typeof value === 'string' && value.trim() !== '' ? value : m
+          })
+          const missing = [...new Set(text.match(this.MASK) || [])]
+          const lack = missing.length ? `в сделке не хватает: ${missing.join(', ')} — поправьте текст перед отправкой` : ''
+          if (await this.writeClipboard(text)) {
+            lack ? this.notify('warn', `Скопировано, но ${lack}`) : this.notify('ok', 'Текст скопирован')
+          } else {
+            this.showManualCopy(text)
+            lack && this.notify('warn', lack[0].toUpperCase() + lack.slice(1))
+          }
+        } catch (e) {
+          this.notify('error', `Не удалось скопировать шаблон: ${e.message}`)
+        } finally {
+          state.copying = null
+          this.update()
+        }
+      }
+    },
     self.renderButton = function (text, id, buttonType = 'pdf', openNewWindow = true, title = '') {
       return self.render({
         ref: '/tmpl/controls/button.twig'
@@ -604,7 +909,7 @@ var CustomWidget = function () {
     },
     self.makeLines = function () {
       return self.docsObjects.map(el => {
-        if (!el.showRules || el.showRules.some(ruleFunction => ruleFunction() === true)) return self.makeTableLine(el.id, el.title, el.buttons)
+        if (!el.showRules || el.showRules.some(ruleFunction => ruleFunction() === true)) return el.render ? el.render() : self.makeTableLine(el.id, el.title, el.buttons)
         return
       }).join("")
     },
@@ -625,6 +930,8 @@ var CustomWidget = function () {
     },
     self.clickHandler = async function (event) {
       const btn = event.target.closest('button')
+      if (!btn) return
+      if (btn.dataset.docgetButtonType?.startsWith('reply-')) return self.replies.click(btn)
       if (btn?.dataset.docgetButtonType === 'calculator') return self.openCalculator()
       if (btn?.dataset.docgetButtonType === 'proposal-open') return self.openProposal()
       if (btn?.dataset.docgetButtonType === 'proposal-text') return self.copyProposalText(btn)
@@ -835,7 +1142,7 @@ var CustomWidget = function () {
           caption: {
             class_name: 'docget' //имя класса для обертки разметки
           },
-          body: `<link type="text/css" rel="stylesheet" href="https://wg.belkurort.by/widget/docjetV2/widget.css?v=1" >
+          body: `<link type="text/css" rel="stylesheet" href="https://wg.belkurort.by/widget/docjetV2/widget.css?v=2" >
                 <div id="docget_docs_area">
                 </div>`,
           render: ``
@@ -856,6 +1163,8 @@ var CustomWidget = function () {
             self.statusChecker();
           }
         })
+        self.onStorage = event => self.replies.syncFromStorage(event)
+        window.addEventListener('storage', self.onStorage)
         const intervalId = setInterval(self.statusPoller, 5000);
         self.intervalsIds.push(intervalId)
       }
@@ -873,6 +1182,8 @@ var CustomWidget = function () {
         self.intervalsIds.forEach(id => {
           clearInterval(id)
         })
+        self.onStorage && window.removeEventListener('storage', self.onStorage)
+        clearTimeout(self.replies.noticeTimer)
       }
     },
     contacts: {
