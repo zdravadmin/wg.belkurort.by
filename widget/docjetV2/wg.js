@@ -791,6 +791,14 @@ var CustomWidget = function () {
         const patronymic = words.findIndex((w, i) => i > 0 && /(вич|вна|ична|чна|ич|оглы|кызы)$/iu.test(w))
         return words[patronymic > 0 ? patronymic - 1 : 0]
       },
+      // «Добрый день, {имя}!» → «Добрый день!», «{имя}, подобрала…» → «Подобрала…»
+      dropName(text) {
+        return text
+          .replace(/[ \t]*,[ \t]*\{имя\}/giu, '')
+          .replace(/(^|[.!?…][ \t]+|\n[ \t]*)\{имя\}[ \t]*,?[ \t]*(\p{L})/giu, (all, before, letter) => before + letter.toUpperCase())
+          .replace(/\{имя\}[ \t]*,[ \t]*/giu, '')
+          .replace(/[ \t]?\{имя\}/giu, '')
+      },
       async clientName() {
         const models = AMOCRM.data.current_card?.linked_forms?.form_models?.models
         if (Array.isArray(models)) {
@@ -882,7 +890,8 @@ var CustomWidget = function () {
             masks.has('{имя}') ? this.clientName() : null
           ])
           const values = {...state.values, ...this.cardValues(), '{имя}': name, '{кп}': proposal}
-          const text = template.text.replace(this.MASK, m => {
+          const source = name ? template.text : this.dropName(template.text)
+          const text = source.replace(this.MASK, m => {
             const value = values[m.toLowerCase()]
             return typeof value === 'string' && value.trim() !== '' ? value : m
           })
