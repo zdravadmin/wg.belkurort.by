@@ -605,7 +605,7 @@ var CustomWidget = function () {
     // Шаблоны ответов авторизованного менеджера: кеш в localStorage, маски подставляются из карточки при клике
     self.replies = {
       VISIBLE: 6,
-      EMPTY_TTL: 3600 * 1000,
+      EMPTY_TTL: 5 * 60 * 1000,
       MASK: /\{[а-яё]+\}/giu,
       state: {userId: null, status: 'idle', templates: [], values: {}, error: '', refreshing: false, expanded: false, notice: null, copying: null},
       managerId() {
