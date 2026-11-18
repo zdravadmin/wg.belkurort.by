@@ -792,6 +792,11 @@ var CustomWidget = function () {
         return words[patronymic > 0 ? patronymic - 1 : 0]
       },
       async clientName() {
+        const models = AMOCRM.data.current_card?.linked_forms?.form_models?.models
+        if (Array.isArray(models)) {
+          const contact = models.find(m => m?.attributes?.ELEMENT_TYPE == 1 && /^\d+$/.test(String(m.attributes.ID ?? '')))?.attributes
+          return contact ? this.firstName(contact['contact[FN]']) || this.firstName(contact['contact[LN]']) : null
+        }
         const lead = AMOCRM.data.current_card?.id
         if (!lead) return null
         try {
