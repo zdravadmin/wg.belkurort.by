@@ -606,7 +606,7 @@ var CustomWidget = function () {
     self.replies = {
       VISIBLE: 6,
       EMPTY_TTL: 5 * 60 * 1000,
-      MASK: /\{[а-яё]+\}/giu,
+      MASK: /\{[а-яё ]+\}/giu,
       state: {userId: null, status: 'idle', templates: [], values: {}, error: '', refreshing: false, expanded: false, notice: null, copying: null},
       managerId() {
         const id = String(self.userId ?? '')
@@ -842,7 +842,9 @@ var CustomWidget = function () {
           '{заезд}': date(305203),
           '{выезд}': date(305205),
           '{срок}': days > 0 ? `${days} ${self.plural(days, 'день', 'дня', 'дней')}` : null,
-          '{санаторий}': this.sanatorium()
+          '{санаторий}': this.sanatorium(),
+          '{договор}': String(self.getCFV(305285) || '').trim() || null,
+          '{дата договора}': date(305287)
         }
       },
       async writeClipboard(text) {
